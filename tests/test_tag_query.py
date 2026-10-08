@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import importlib
 import re
 import sqlite3
@@ -248,6 +249,25 @@ def test_opds_lists_saved_searches(library):
     assert [e.findtext(f"{ATOM}title") for e in feed.iter(f"{ATOM}entry")] == ["C.cbz"]
 
     assert client.get("/opds/saved-searches/999").status_code == 404
+
+
+@pytest.mark.parametrize("name", ["Action/Adventure", "Sci#Fi", "What?", "100%", "R&D", 'Say "hi"'])
+def test_saved_search_links_survive_url_significant_tag_names(library, name):
+    db_file, client = library
+    with closing(sqlite3.connect(db_file)) as conn, conn:
+        tag_id = conn.execute("INSERT INTO tags (name) VALUES (?)", (name,)).lastrowid
+        comic_id = conn.execute("SELECT id FROM comics WHERE filename = 'D.cbz'").fetchone()[0]
+        conn.execute("INSERT INTO comic_tags (comic_id, tag_id) VALUES (?, ?)", (comic_id, tag_id))
+    client.post("/reader/api/saved-searches", json={"name": "Special", "all": [name]})
+
+    page = client.get("/reader/tags")
+    href = re.search(r'href="(/reader/tag-search\?[^"]+)"', page.text).group(1).replace("&amp;", "&")
+    result = client.get(href)
+
+    assert "D.cbz" in result.text and "A.cbz" not in result.text
+    edit = re.search(r'href="(/reader/tags\?[^"]+)"', result.text).group(1).replace("&amp;", "&")
+    found = re.findall(r'data-tag-name="([^"]+)" data-state="([^"]*)"', client.get(edit).text)
+    assert {html.unescape(tag): state for tag, state in found}[name] == "all"
 
 
 def test_opds_search_finds_tags(library):
