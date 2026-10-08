@@ -90,6 +90,31 @@ def _write_config(config_path: Path, library_path: Path, library_name: str) -> N
         parser.write(handle)
 
 
+def _prepare_database() -> None:
+    """Create tables, then bring the database to head before anything scans it.
+
+    A scan on a database that still needs a data migration would write rows
+    the migration then conflicts with.
+    """
+    init_db()
+
+    # Migrations: stamp legacy DBs, then upgrade to head.
+    stamp_if_needed()
+    current, head = get_status()
+    if current != head:
+        logger.info(f"Migrating database {current} -> {head} ...")
+        run_migrations(backup=True)
+        logger.info("Migration complete.")
+    else:
+        logger.info(f"Database at {head} (up to date).")
+
+    if ensure_ongoing_series_table():
+        logger.info("ongoing_series table was missing and has been repaired.")
+
+    if ensure_tags_tables():
+        logger.info("tags/comic_tags tables were missing and have been repaired.")
+
+
 @app.command()
 def init(
     library: Path = typer.Option(..., "--library", help="Path to your comics folder"),
@@ -115,6 +140,7 @@ def scan(
     setup_logging()
     
     config = _ensure_config()
+    _prepare_database()
     try:
         stats = scan_library(config, path=path, force=force, prune=prune)
     except LibraryUnavailableError as exc:
@@ -141,23 +167,7 @@ def serve(
     
     typer.echo(typer.style(STARTUP_BANNER, fg=typer.colors.MAGENTA, bold=True))
     config = _ensure_config()
-    init_db()
-
-    # Migrations: stamp legacy DBs, then upgrade to head.
-    stamp_if_needed()
-    current, head = get_status()
-    if current != head:
-        logger.info(f"Migrating database {current} -> {head} ...")
-        run_migrations(backup=True)
-        logger.info("Migration complete.")
-    else:
-        logger.info(f"Database at {head} (up to date).")
-
-    if ensure_ongoing_series_table():
-        logger.info("ongoing_series table was missing and has been repaired.")
-
-    if ensure_tags_tables():
-        logger.info("tags/comic_tags tables were missing and have been repaired.")
+    _prepare_database()
 
     if ensure_comic_tags_cascade():
         logger.info("comic_tags lacked ON DELETE CASCADE and has been rebuilt.")
