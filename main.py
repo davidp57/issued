@@ -50,6 +50,9 @@ def _ensure_config() -> IssuedConfig:
     except FileNotFoundError:
         typer.echo("[ERROR] config.ini not found. Run: issued init --library /path/to/comics")
         raise typer.Exit(code=1)
+    except (ValueError, configparser.Error) as exc:
+        typer.echo(f"[ERROR] config.ini: {exc}")
+        raise typer.Exit(code=1)
     configure_rar_tool(config.scanner.unrar_tool)
     return config
 

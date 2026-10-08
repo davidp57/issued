@@ -399,7 +399,7 @@ same folder as the executable unless you set `DATA_DIR`; for Docker it is
 
 ## Advanced Configuration
 
-Edit `config.ini` for more options:
+Edit `config.ini` for more options. A `#` or `;` preceded by a space starts a comment, so a value cannot contain ` #` (a library named `Comics #1` would become `Comics`); a `#` inside a word, as in `BD#2`, is kept.
 
 ```ini
 [library]

@@ -149,8 +149,11 @@ def load_config(config_path: Optional[pathlib.Path] = None) -> IssuedConfig:
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
 
-    parser = configparser.ConfigParser()
-    parser.read(path)
+    # The README documents settings with trailing comments
+    # (``port = 8181   # ...``): strip them, but only after whitespace,
+    # so a ``#`` inside a value such as ``BD#2`` is kept.
+    parser = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
+    parser.read(path, encoding="utf-8")
 
     lib_path = pathlib.Path(
         parser.get("library", "path", fallback="/path/to/comics")
