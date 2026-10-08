@@ -250,6 +250,90 @@
   cursor: none;
 }
 
+/* --- Fit page: the page fills the browser window, without the Fullscreen API --- */
+html[data-reader-fit="page"] .reader-page .site-header {
+  display: none;
+}
+
+html[data-reader-fit="page"] .reader-page .site-main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+html[data-reader-fit="page"] .reader-page .reader {
+  position: relative;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html[data-reader-fit="page"] .reader-page .reader-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+}
+
+/* Pages are turned by clicking the page edges or with the arrow keys. */
+html[data-reader-fit="page"] .reader-page .reader-navigation,
+html[data-reader-fit="page"] .reader-page .reader-hints {
+  display: none !important;
+}
+
+html[data-reader-fit="page"] .reader-page .reader-image-wrap {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-reader-fit="page"] .reader-page .reader-image-wrap img {
+  max-height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-reader-fit="page"] .reader-page #reader-progress-error,
+html[data-reader-fit="page"] .reader-page #reader-series-end {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  z-index: 20;
+  margin: 0;
+}
+
+html[data-reader-fit="page"] .reader-page #reader-progress-error {
+  top: 5rem;
+}
+
+html[data-reader-fit="page"] .reader-page #reader-series-end {
+  bottom: 1rem;
+}
+
+/* The end-of-series card sits over the page, so it comes and goes with the toolbar. */
+html[data-reader-fit="page"] .reader-page .reader.cursor-hidden #reader-series-end {
+  display: none;
+}
+
+html[data-reader-fit="page"] .reader-page .reader.cursor-hidden,
+html[data-reader-fit="page"] .reader-page .reader.cursor-hidden .reader-image-wrap {
+  cursor: none;
+}
+
+/* --- Page-turn zones: the cursor shows which way a click goes --- */
+.reader-image-wrap[data-nav-zone="previous"] {
+  cursor: w-resize;
+}
+
+.reader-image-wrap[data-nav-zone="next"] {
+  cursor: e-resize;
+}
+
 @media (max-width: 639px) {
   .reader-page {
     background: #f8fafc;

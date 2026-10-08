@@ -44,6 +44,18 @@ export function navigationEdgeWidth(viewportWidth) {
   return Math.max(NAV_EDGE_MIN_PX, Math.min(NAV_EDGE_MAX_PX, viewportWidth * NAV_EDGE_RATIO));
 }
 
+// Zones are anchored to the displayed page(s), not to the frame: on a wide window the page is
+// centred between empty bands, and an edge measured on the frame would land in those bands
+// instead of on the page. Everything left of the page plus its left edge band turns back.
+export function navigationZone(clientX, pageLeft, pageRight) {
+  const pageWidth = pageRight - pageLeft;
+  // A third of the page always stays in the centre for toolbar taps and double-tap zoom.
+  const edge = Math.min(navigationEdgeWidth(pageWidth), pageWidth / 3);
+  if (clientX <= pageLeft + edge) return 'previous';
+  if (clientX >= pageRight - edge) return 'next';
+  return 'center';
+}
+
 export function createReaderInteractions({
   viewport,
   content,
@@ -147,6 +159,8 @@ export function createReaderInteractions({
     zoomed = value;
     customContainment = value && isMobileSpread();
     viewport.classList.toggle('is-zoomed', value);
+    // Zoomed clicks pan instead of turning pages; drop the page-turn cursor until the next move.
+    if (value) delete viewport.dataset.navZone;
     viewport.dataset.zoomed = value ? 'true' : 'false';
     viewport.setAttribute(
       'aria-label',
@@ -273,19 +287,47 @@ export function createReaderInteractions({
       return;
     }
 
-    const rect = viewport.getBoundingClientRect();
-    const localX = event.clientX - rect.left;
-    const edge = navigationEdgeWidth(rect.width);
-    if (localX <= edge) {
+    const zone = zoneAt(event.clientX);
+    if (zone === 'previous') {
       lastTap = null;
       onPrevious();
-    } else if (localX >= rect.width - edge) {
+    } else if (zone === 'next') {
       lastTap = null;
       onNext();
     } else {
       registerTap(event);
     }
   };
+
+  // Horizontal extent of the visible page images; the frame itself while none has a size yet.
+  const pageBounds = () => {
+    let left = Infinity;
+    let right = -Infinity;
+    content.querySelectorAll('img').forEach((image) => {
+      const rect = image.getBoundingClientRect();
+      if (rect.width === 0) return;
+      left = Math.min(left, rect.left);
+      right = Math.max(right, rect.right);
+    });
+    if (left < right) return { left, right };
+    const rect = viewport.getBoundingClientRect();
+    return { left: rect.left, right: rect.right };
+  };
+
+  const zoneAt = (clientX) => {
+    const { left, right } = pageBounds();
+    return navigationZone(clientX, left, right);
+  };
+
+  // A mouse shows which way a click turns the page.
+  const hover = (event) => {
+    if (event.pointerType !== 'mouse' || zoomed) {
+      delete viewport.dataset.navZone;
+      return;
+    }
+    viewport.dataset.navZone = zoneAt(event.clientX);
+  };
+  const leave = () => { delete viewport.dataset.navZone; };
 
   const pointerCancel = () => {
     pointer = null;
@@ -305,6 +347,8 @@ export function createReaderInteractions({
   viewport.addEventListener('pointermove', pointerMove);
   viewport.addEventListener('pointerup', pointerUp);
   viewport.addEventListener('pointercancel', pointerCancel);
+  viewport.addEventListener('pointermove', hover);
+  viewport.addEventListener('pointerleave', leave);
   content.addEventListener('panzoomstart', panStart);
   content.addEventListener('panzoomend', panEnd);
   window.addEventListener('resize', resize);
@@ -314,6 +358,8 @@ export function createReaderInteractions({
     viewport.removeEventListener('pointermove', pointerMove);
     viewport.removeEventListener('pointerup', pointerUp);
     viewport.removeEventListener('pointercancel', pointerCancel);
+    viewport.removeEventListener('pointermove', hover);
+    viewport.removeEventListener('pointerleave', leave);
     content.removeEventListener('panzoomstart', panStart);
     content.removeEventListener('panzoomend', panEnd);
     window.removeEventListener('resize', resize);

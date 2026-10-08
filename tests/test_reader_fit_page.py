@@ -1,0 +1,55 @@
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+READER = PROJECT_ROOT / "reader"
+
+
+def _read(*parts: str) -> str:
+    return READER.joinpath(*parts).read_text(encoding="utf-8")
+
+
+def test_fit_page_choice_is_applied_before_first_paint():
+    base = _read("templates", "base.html")
+
+    assert "localStorage.getItem('issued-reader-fit')" in base
+    assert "root.dataset.readerFit = savedReaderFit === 'page' ? 'page' : 'none';" in base
+    assert "root.dataset.readerFit = 'none';" in base
+
+
+def test_reader_offers_a_fit_page_toggle():
+    template = _read("templates", "reader.html")
+    script = _read("static", "js", "reader.js")
+
+    assert 'id="btn-fit-page"' in template
+    assert 'aria-pressed="false"' in template
+    assert "const FIT_STORAGE_KEY = 'issued-reader-fit';" in script
+    assert "const isImmersive = () => Boolean(document.fullscreenElement) || isFitPage();" in script
+    assert "w: toggleFitPage" in script
+    assert "W: toggleFitPage" in script
+    assert "if (e.ctrlKey || e.metaKey || e.altKey) return;" in script
+    assert "e.key === 'Escape' && isFitPage() && !document.fullscreenElement" in script
+    # Toolbars auto-hide in both immersive modes, not only in fullscreen.
+    assert "if (!document.fullscreenElement) return;" not in script
+
+
+def test_fit_page_styles_fill_the_window_without_page_buttons():
+    styles = _read("static", "css", "style.css")
+
+    assert 'html[data-reader-fit="page"] .reader-page .site-header' in styles
+    assert 'html[data-reader-fit="page"] .reader-page .reader {\n  position: relative;\n  height: 100dvh;' in styles
+    assert 'html[data-reader-fit="page"] .reader-page .reader.cursor-hidden #reader-series-end' in styles
+    assert 'html[data-reader-fit="page"] .reader-page .reader-navigation' in styles
+    assert 'html[data-reader-fit="page"] .reader-page .reader-image-wrap img' in styles
+
+
+def test_page_turn_zones_are_anchored_to_the_displayed_page():
+    script = _read("static", "js", "reader-interactions.js")
+    styles = _read("static", "css", "style.css")
+
+    assert "export function navigationZone(clientX, pageLeft, pageRight)" in script
+    assert "Math.min(navigationEdgeWidth(pageWidth), pageWidth / 3)" in script
+    assert "content.querySelectorAll('img')" in script
+    assert "viewport.dataset.navZone = zoneAt(event.clientX);" in script
+    assert '.reader-image-wrap[data-nav-zone="previous"]' in styles
+    assert '.reader-image-wrap[data-nav-zone="next"]' in styles
