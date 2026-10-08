@@ -38,7 +38,8 @@ def test_fit_page_styles_fill_the_window_without_page_buttons():
 
     assert 'html[data-reader-fit="page"] .reader-page .site-header' in styles
     assert 'html[data-reader-fit="page"] .reader-page .reader {\n  position: relative;\n  height: 100dvh;' in styles
-    assert 'html[data-reader-fit="page"] .reader-page .reader.cursor-hidden #reader-series-end' in styles
+    # The end-of-issue card no longer leaves with the toolbar.
+    assert 'html[data-reader-fit="page"] .reader-page .reader.cursor-hidden #reader-series-end' not in styles
     assert 'html[data-reader-fit="page"] .reader-page .reader-navigation' in styles
     assert 'html[data-reader-fit="page"] .reader-page .reader-image-wrap img' in styles
 

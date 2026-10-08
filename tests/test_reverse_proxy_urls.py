@@ -124,11 +124,11 @@ def test_reader_page_uses_origin_relative_page_image_url(proxy_app, monkeypatch)
     assert 'src="/reader/api/comic/proxy-comic/page/1"' in response.text
     assert 'src="/reader/static/js/reader.js"' in response.text
     assert "reader-page" in response.text
-    assert 'href="/reader/" class="reader-mobile-back"' in response.text
+    assert 'href="/reader/" class="reader-back"' in response.text
     assert "issued.internal:8181" not in response.text
 
 
-def test_reader_mobile_back_link_targets_containing_folder(proxy_app, monkeypatch):
+def test_reader_back_links_target_containing_folder(proxy_app, monkeypatch):
     _, _, client = proxy_app
     browse_module = importlib.import_module("reader.routes.browse")
     monkeypatch.setattr(
@@ -150,6 +150,9 @@ def test_reader_mobile_back_link_targets_containing_folder(proxy_app, monkeypatc
     assert response.status_code == 200
     assert 'href="/reader/folder/7"' in response.text
     assert 'aria-label="Back to Series"' in response.text
+    # The desktop toolbar names the series as a link too, not only the mobile one.
+    assert 'class="reader-series-link' in response.text
+    assert '>Series</a>' in response.text
 
 
 def test_reader_auth_pages_and_redirects_use_origin_relative_urls(proxy_app):

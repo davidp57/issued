@@ -36,6 +36,8 @@ import {
   const actionsPanel = $('#reader-actions-panel');
   const actionsBackdrop = $('#reader-actions-backdrop');
   const seriesEnd = $('#reader-series-end');
+  const seriesEndClose = $('#reader-series-end-close');
+  const nextIssueLink = $('#reader-next-issue');
   const progressError = $('#reader-progress-error');
   const comicLinks = document.querySelectorAll('.reader-comic-link');
   const controlEls = ['.reader-controls', '.reader-navigation', '.reader-hints'].map($);
@@ -58,6 +60,7 @@ import {
   let completed = wasCompleted;
   let interactions = null;
   let mobileActionsOpen = false;
+  let seriesEndDismissed = false;
 
   // --- Helpers ---
 
@@ -115,6 +118,8 @@ import {
     if (coverSeparate && currentPage === 1) return 2;
     return currentPage + 2;
   };
+
+  const isLastSpread = () => getNextPage() > pageCount;
 
   const getPrevPage = () => {
     if (!twoPageMode) return currentPage - 1;
@@ -193,13 +198,22 @@ import {
     pageNumEl.textContent = rightPage ? `${page}–${rightPage}` : `${page}`;
     progressBar.style.width = `${(page / pageCount) * 100}%`;
     prevBtn.disabled = getPrevPage() < 1;
-    nextBtn.disabled = getNextPage() > pageCount;
-    seriesEnd?.classList.toggle('hidden', lastVisiblePage < pageCount);
+    // On the last page the Next button and the next page turn open the next issue.
+    nextBtn.disabled = isLastSpread() && !nextIssueLink;
+    nextBtn.setAttribute('aria-label', isLastSpread() && nextIssueLink ? 'Next issue' : 'Next page');
+    if (lastVisiblePage < pageCount) seriesEndDismissed = false;
+    seriesEnd?.classList.toggle('hidden', lastVisiblePage < pageCount || seriesEndDismissed);
 
     saveProgress(page, rightPage);
   };
 
-  const navigate = (delta) => updatePage(delta > 0 ? getNextPage() : getPrevPage());
+  const navigate = (delta) => {
+    if (delta > 0 && isLastSpread()) {
+      if (nextIssueLink && !loading) openComic(nextIssueLink);
+      return;
+    }
+    updatePage(delta > 0 ? getNextPage() : getPrevPage());
+  };
 
   // --- Progress save (debounced) ---
 
@@ -230,15 +244,20 @@ import {
     progressTimer = setTimeout(() => { persistProgress(lastVisible); }, 500);
   };
 
-  const navigateToComic = async (event) => {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    const link = event.currentTarget;
+  // Progress is saved before leaving, so the issue just finished is marked read.
+  const openComic = async (link) => {
+    if (link.getAttribute('aria-disabled') === 'true') return;
     clearTimeout(progressTimer);
     link.setAttribute('aria-disabled', 'true');
     const saved = await persistProgress(lastVisiblePage, { showError: true });
     link.removeAttribute('aria-disabled');
     if (saved) window.location.assign(link.href);
+  };
+
+  const navigateToComic = (event) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    openComic(event.currentTarget);
   };
 
   // --- Progress bar scrubbing ---
@@ -447,6 +466,10 @@ import {
   prevBtn.addEventListener('click', () => { navigate(-1); showControls(); });
   nextBtn.addEventListener('click', () => { navigate(1); showControls(); });
   comicLinks.forEach((link) => link.addEventListener('click', navigateToComic));
+  seriesEndClose?.addEventListener('click', () => {
+    seriesEndDismissed = true;
+    seriesEnd?.classList.add('hidden');
+  });
   btnSpread.addEventListener('click', () => { toggleSpread(); showControls(); });
   btnCoverSep.addEventListener('click', () => { toggleCoverSep(); showControls(); });
   btnFitPage?.addEventListener('click', toggleFitPage);
@@ -473,7 +496,8 @@ import {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const actions = {
       ArrowLeft: () => navigate(-1),
-      ArrowRight: () => navigate(1),
+      // A held key stops at the last page instead of running into the next issue.
+      ArrowRight: () => { if (!(e.repeat && isLastSpread())) navigate(1); },
       f: toggleFullscreen,
       F: toggleFullscreen,
       w: toggleFitPage,
