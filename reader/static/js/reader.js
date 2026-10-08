@@ -4,7 +4,7 @@ import {
 } from './reader-interactions.js';
 
 /**
- * Issued web reader – page navigation, fullscreen, progress tracking, spread view
+ * Issued web reader – page navigation, fullscreen, fit page, progress tracking, spread view
  */
 (() => {
   const reader = document.querySelector('.reader');
@@ -30,6 +30,7 @@ import {
   const iconSpreadOff = $('#icon-spread-off');
   const iconSpreadOn = $('#icon-spread-on');
   const btnCoverSep = $('#btn-cover-sep');
+  const btnFitPage = $('#btn-fit-page');
   const readerControls = $('.reader-controls');
   const actionsToggle = $('#reader-actions-toggle');
   const actionsPanel = $('#reader-actions-panel');
@@ -39,6 +40,8 @@ import {
   const comicLinks = document.querySelectorAll('.reader-comic-link');
   const controlEls = ['.reader-controls', '.reader-navigation', '.reader-hints'].map($);
   const mobileReaderQuery = window.matchMedia(MOBILE_READER_MEDIA_QUERY);
+  const root = document.documentElement;
+  const FIT_STORAGE_KEY = 'issued-reader-fit';
 
   const comicUuid = reader.dataset.comicUuid;
   const pageCount = parseInt(reader.dataset.pageCount, 10) || 1;
@@ -87,6 +90,11 @@ import {
     `/reader/api/comic/${encodeURIComponent(comicUuid)}/page/${p}`;
 
   const setSpinner = (on) => spinner?.classList.toggle('visible', on);
+
+  const isFitPage = () => root.dataset.readerFit === 'page';
+
+  // Fullscreen and fit-page both overlay the toolbars on the page and hide them while reading.
+  const isImmersive = () => Boolean(document.fullscreenElement) || isFitPage();
 
   const setControlsVisible = (visible) => {
     controlEls.forEach(el => el?.classList.toggle('hidden', !visible));
@@ -333,12 +341,33 @@ import {
   };
 
   const showControls = () => {
-    if (!document.fullscreenElement) return;
+    if (!isImmersive()) return;
     setControlsVisible(true);
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
-      if (document.fullscreenElement) setControlsVisible(false);
+      if (isImmersive()) setControlsVisible(false);
     }, 3000);
+  };
+
+  // --- Fit page: the page fills the browser window without the Fullscreen API ---
+
+  const setFitPage = (on) => {
+    interactions?.resetZoom({ animate: false });
+    root.dataset.readerFit = on ? 'page' : 'none';
+    btnFitPage?.setAttribute('aria-pressed', String(on));
+    btnFitPage?.classList.toggle('btn-view-active', on);
+    try { localStorage.setItem(FIT_STORAGE_KEY, root.dataset.readerFit); } catch (_) { /* private mode */ }
+    if (isImmersive()) {
+      showControls();
+    } else {
+      clearTimeout(hideTimer);
+      setControlsVisible(true);
+    }
+  };
+
+  const toggleFitPage = () => {
+    closeMobileActions();
+    setFitPage(!isFitPage());
   };
 
   fsBtn.addEventListener('click', toggleFullscreen);
@@ -357,7 +386,7 @@ import {
     closeMobileActions();
     fsIconEnter.classList.toggle('hidden', !!document.fullscreenElement);
     fsIconExit.classList.toggle('hidden', !document.fullscreenElement);
-    if (document.fullscreenElement) {
+    if (isImmersive()) {
       showControls();
     } else {
       setControlsVisible(true);
@@ -367,7 +396,7 @@ import {
 
   // On touch screens a tap is the only way to bring the toolbars back once they hide.
   const toggleControlsFromTap = () => {
-    if (!document.fullscreenElement) return;
+    if (!isImmersive()) return;
     if (controlEls.some(el => el?.classList.contains('hidden'))) {
       showControls();
     } else {
@@ -389,6 +418,7 @@ import {
   comicLinks.forEach((link) => link.addEventListener('click', navigateToComic));
   btnSpread.addEventListener('click', () => { toggleSpread(); showControls(); });
   btnCoverSep.addEventListener('click', () => { toggleCoverSep(); showControls(); });
+  btnFitPage?.addEventListener('click', toggleFitPage);
 
   // --- Keyboard ---
 
@@ -403,11 +433,20 @@ import {
     if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
       return;
     }
+    if (e.key === 'Escape' && isFitPage() && !document.fullscreenElement) {
+      e.preventDefault();
+      setFitPage(false);
+      return;
+    }
+    // Leave browser shortcuts such as Ctrl+F or Ctrl+W to the browser.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     const actions = {
       ArrowLeft: () => navigate(-1),
       ArrowRight: () => navigate(1),
       f: toggleFullscreen,
       F: toggleFullscreen,
+      w: toggleFitPage,
+      W: toggleFitPage,
       z: () => interactions?.toggleZoomAtCenter(),
       Z: () => interactions?.toggleZoomAtCenter(),
     };
@@ -418,6 +457,9 @@ import {
 
   syncMobileActionsLayout();
   updateBtnStates();
+  btnFitPage?.setAttribute('aria-pressed', String(isFitPage()));
+  btnFitPage?.classList.toggle('btn-view-active', isFitPage());
+  showControls();
 
   if (img && spinner) {
     setSpinner(true);
