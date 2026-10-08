@@ -48,7 +48,7 @@ def test_legacy_database_is_stamped_below_the_data_migrations(db_file):
 
     migrations.stamp_if_needed()
 
-    assert migrations.get_status() == (migrations.LEGACY_BASELINE, "0004")
+    assert migrations.get_status() == (migrations.LEGACY_BASELINE, "0005")
 
 
 @pytest.mark.skipif(os.name != "nt", reason="backslash separators only exist in Windows databases")

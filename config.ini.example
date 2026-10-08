@@ -27,3 +27,9 @@ debounce_seconds = 2
 # Web reader login (leave empty to allow access without password)
 user =
 password =
+
+[deletion]
+# Delete action in the web reader: off, delete (removes the file from disk)
+# or trash (moves it to trash_path, which must lie outside the library)
+mode = off
+trash_path =

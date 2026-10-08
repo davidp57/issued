@@ -326,6 +326,39 @@ Or manually scan from the command line:
 ./issued scan
 ```
 
+### Delete comics
+
+Deleting is off by default. Turn it on in `config.ini`:
+
+```ini
+[deletion]
+mode = trash                 # off, delete or trash
+trash_path = /trash          # only for mode = trash
+```
+
+- `delete` removes the file from disk. There is no way back.
+- `trash` moves the file to `trash_path`, keeping its folders, so you can restore it later. The trash folder must lie outside the comics folder.
+
+Then open a comic's info panel (the pencil icon) and click **Delete**. Issued asks for confirmation first.
+
+Issued remembers every comic you delete, so a sync tool that drops the same file again does not bring it back: the next scan skips any file with the name and the exact content of a deleted comic. A file with the same name but a different content is imported, and the **Trash** page in the top menu warns about it.
+
+The **Trash** page lists the deleted comics:
+- **Restore** moves a trashed comic back to its place. Its tags and reading progress are not restored.
+- **Forget** removes a comic from the list, so a file with that name is imported again.
+
+Moving a file out of the trash folder by hand does not restore it: the scan skips it until you click **Forget**.
+
+With Docker, the comics folder must be mounted read-write (drop `:ro`), and the trash folder needs a volume of its own:
+
+```yaml
+    volumes:
+      - /path/to/your/comics:/comics
+      - /path/to/your/comics-trash:/trash
+```
+
+If the trash volume is not mounted, Issued refuses to delete instead of filling a folder that would vanish with the container.
+
 ### Rescan everything
 
 ```bash
@@ -362,6 +395,7 @@ same folder as the executable unless you set `DATA_DIR`; for Docker it is
 - Change port: `[server]` → `port = 8080`
 - Add password: `[reader]` → `user = name`, `password = pass`
 - Adjust thumbnails: `[thumbnails]` → `width`, `height`, `quality`
+- Allow deleting comics: `[deletion]` → `mode = trash`, `trash_path = /trash` (see [Delete comics](#delete-comics))
 
 ## Advanced Configuration
 
@@ -389,6 +423,10 @@ debounce_seconds = 2     # Wait time before processing changes
 [reader]
 user =                   # Leave empty for no password
 password =               # Leave empty for no password
+
+[deletion]
+mode = off               # off, delete (from disk) or trash
+trash_path =             # Trash folder for mode = trash, outside the library
 ```
 
 ### Reverse proxy

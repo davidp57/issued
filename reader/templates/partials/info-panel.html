@@ -143,6 +143,11 @@
       <!-- Actions -->
       <div
         class="sticky bottom-0 -mx-4 -mb-4 flex justify-end gap-3 border-t border-gray-100 bg-white px-4 py-4 sm:-mx-6 sm:-mb-6 sm:px-6">
+        {% if deletion_mode() != 'off' %}
+        <button type="button" id="comic-info-delete" data-mode="{{ deletion_mode() }}"
+          class="mr-auto flex items-center gap-1.5 rounded-xl border-2 border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 active:scale-95">
+          <i data-lucide="trash-2" class="h-4 w-4"></i>Delete</button>
+        {% endif %}
         <button type="button" id="comic-info-cancel"
           class="rounded-xl border-2 border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-95">Cancel</button>
         <button type="submit"

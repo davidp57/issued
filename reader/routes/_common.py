@@ -60,6 +60,16 @@ def _reader_auth_enabled() -> bool:
         return False
 
 
+def _deletion_mode() -> str:
+    try:
+        return get_config().deletion.mode
+    except FileNotFoundError:
+        return "off"
+
+
+templates.env.globals["deletion_mode"] = _deletion_mode
+
+
 def _folder_ongoing_context(conn, folder_id: int | None) -> dict:
     """Leaf folder + ongoing flag for series browse UI."""
     if folder_id is None:

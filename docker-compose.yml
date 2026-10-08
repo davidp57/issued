@@ -11,6 +11,11 @@ services:
       # Change the left side to the absolute path of your comics folder.
       - /path/to/your/comics:/comics:ro
 
+      # Deleting comics from the web reader ([deletion] in config.ini) needs
+      # the comics folder read-write (drop ":ro") and, for mode = trash,
+      # a trash folder outside the library:
+      # - /path/to/your/comics-trash:/trash
+
       # Persistent data: config.ini, library.db, thumbnails/ all live here.
       - issued_data:/app/data
 
