@@ -65,3 +65,14 @@ def test_fit_page_enlarges_scans_smaller_than_the_window():
     assert "object-fit: contain;" in block
     assert "#reader-image {\n    object-position: right center;" in block
     assert "#reader-image-right {\n    object-position: left center;" in block
+
+
+def test_toolbar_hides_soon_after_the_mouse_stops_unless_in_use():
+    script = _read("static", "js", "reader.js")
+
+    assert "const HIDE_AFTER_MOUSE_MS = 1000;" in script
+    assert "const HIDE_AFTER_TOUCH_MS = 3000;" in script
+    assert "if (event.pointerType === 'mouse') showControls(HIDE_AFTER_MOUSE_MS);" in script
+    assert "readerControls?.addEventListener('pointerenter'" in script
+    assert "readerControls?.addEventListener('pointerleave'" in script
+    assert "if (controlsInUse()) scheduleHide(HIDE_AFTER_MOUSE_MS);" in script
