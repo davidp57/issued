@@ -9,6 +9,14 @@
       class="bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
       {{ title }}</h1>
 
+    {% if tag_query_string is defined %}
+    <a href="{{ url_path(request, 'browse_tags') }}?{{ tag_query_string }}"
+      class="ml-auto inline-flex shrink-0 items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-medium text-violet-700 shadow-sm transition hover:bg-violet-50">
+      <i data-lucide="pencil" class="h-4 w-4"></i>
+      <span class="hidden sm:inline">Edit or save</span>
+    </a>
+    {% endif %}
+
     <div class="relative shrink-0">
       <button id="display-settings-toggle" type="button"
         class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"

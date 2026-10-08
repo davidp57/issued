@@ -115,3 +115,14 @@ class DeletedComic(SQLModel, table=True):
     deleted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     conflict_path: Optional[str] = None
     conflict_at: Optional[datetime] = None
+
+
+class SavedSearch(SQLModel, table=True):
+    """A named tag combination, listed on the tags page and in the OPDS catalog."""
+
+    __tablename__ = "saved_searches"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True, index=True)
+    criteria: str  # JSON of server.tag_query.TagQuery
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

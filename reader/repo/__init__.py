@@ -40,6 +40,7 @@ from .tags import (
     get_all_tags,
     get_all_tags_with_counts,
     get_comics_for_tag,
+    get_comics_for_tag_query,
     delete_tag,
     set_tags_for_comic,
 )
@@ -63,7 +64,7 @@ __all__ = [
     "get_progress", "update_progress", "clear_progress",
     "mark_all_comics_in_folder_completed", "toggle_comic_completed",
     "get_tags_for_comic", "get_all_tags", "get_all_tags_with_counts",
-    "get_comics_for_tag", "delete_tag", "set_tags_for_comic",
+    "get_comics_for_tag", "get_comics_for_tag_query", "delete_tag", "set_tags_for_comic",
     "folder_is_leaf", "folder_comic_count", "is_ongoing_series",
     "set_ongoing_series", "list_ongoing_series_rows",
 ]

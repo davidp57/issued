@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from server.tag_query import TagQuery
+
 from .comics import _COMICS_WITH_META
 from .metadata import get_comic_id_by_uuid
 
@@ -54,12 +56,24 @@ def get_comics_for_tag(conn, tag_name: str) -> list[dict]:
         + " WHERE t.name = ? ORDER BY f.name, c.filename",
         (tag_name,),
     )
-    rows = [dict(row) for row in cur.fetchall()]
+    return _group_by_folder(cur.fetchall())
+
+
+def get_comics_for_tag_query(conn, query: TagQuery) -> list[dict]:
+    """Comics matching a tag combination (all / any / none), grouped by folder."""
+    where, params = query.where_sql()
+    cur = conn.execute(
+        _COMICS_WITH_META + f" WHERE {where} ORDER BY f.name, c.filename",
+        params,
+    )
+    return _group_by_folder(cur.fetchall())
+
+
+def _group_by_folder(rows) -> list[dict]:
     groups: dict[str, list] = {}
     for row in rows:
-        key = row["folder_name"] or ""
-        groups.setdefault(key, [])
-        groups[key].append(row)
+        row = dict(row)
+        groups.setdefault(row["folder_name"] or "", []).append(row)
     return [{"series": name, "comics": comics} for name, comics in groups.items()]
 
 

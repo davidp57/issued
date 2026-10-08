@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 
 from server.database import db_connection
+from server.saved_searches import list_saved_searches
+from server.tag_query import TagQuery
 from .. import repo
 from .. import services
 from .. import series
@@ -306,18 +308,70 @@ def reader_view(
 # --- Browse: tags ---
 
 
+def _tag_query(
+    all_tags: list[str] = Query([], alias="all"),
+    any_tags: list[str] = Query([], alias="any"),
+    none_tags: list[str] = Query([], alias="none"),
+) -> TagQuery:
+    return TagQuery.build(all=all_tags, any=any_tags, none=none_tags)
+
+
 @router.get("/tags")
-def browse_tags(request: Request):
-    """Tag index: all tags with comic counts."""
+def browse_tags(request: Request, query: TagQuery = Depends(_tag_query)):
+    """Tag index: all tags with comic counts, the combination form, saved searches.
+
+    ``all``, ``any`` and ``none`` preselect the form, so a result page can
+    link back to the combination it shows.
+    """
     with db_connection() as conn:
         tag_rows = repo.get_all_tags_with_counts(conn)
+        saved = list_saved_searches(conn)
+    # A tag of the combination may have been deleted since it was saved: show
+    # it with no comics, so saving again does not drop it without a word.
+    known = {row["name"] for row in tag_rows}
+    missing = [name for name in query.all + query.any + query.none if name not in known]
+    tag_rows += [{"name": name, "comic_count": 0} for name in missing]
     return templates.TemplateResponse(
         request,
         "tags.html",
         {
             "title": f"Tags — {_library_title()}",
             "tag_rows": tag_rows,
+            "tag_states": {
+                **{name: "all" for name in query.all},
+                **{name: "any" for name in query.any},
+                **{name: "none" for name in query.none},
+            },
+            "saved_searches": saved,
             "reader_auth_enabled": _reader_auth_enabled(),
+        },
+    )
+
+
+@router.get("/tag-search")
+def browse_tag_search(request: Request, query: TagQuery = Depends(_tag_query)):
+    """Comics matching a tag combination: all of ``all``, one of ``any``, none of ``none``."""
+    with db_connection() as conn:
+        grouped_comics = repo.get_comics_for_tag_query(conn, query)
+    description = query.describe() or "no tag selected"
+    return templates.TemplateResponse(
+        request,
+        "browser.html",
+        {
+            "title": f"Tags: {description} — {_library_title()}",
+            "tag_query_string": query.query_string(),
+            "breadcrumbs": [],
+            "folders": [],
+            "comics": [],
+            "grouped_comics": grouped_comics,
+            "is_search": True,
+            "show_last_added": False,
+            "last_added_comics": [],
+            "continue_reading_comics": [],
+            "reader_auth_enabled": _reader_auth_enabled(),
+            "folder_id": None,
+            "is_leaf": False,
+            "is_ongoing": False,
         },
     )
 

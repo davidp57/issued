@@ -38,7 +38,8 @@ All formats support:
 ## OPDS Features
 
 - **Browse your library** – Navigate folders and series, with cover previews and a recent additions feed.
-- **Search** – Find comics by filename or metadata, with OpenSearch discovery for compatible apps.
+- **Search** – Find comics by filename, metadata or tag, with OpenSearch discovery for compatible apps.
+- **Saved searches** – Tag combinations saved in the web reader appear under **Saved searches** in the catalog.
 - **Download originals** – Download complete comic archives or PDFs.
 - **Page streaming (OPDS-PSE 1.2)** – Read individual pages in compatible apps without downloading the whole comic. Existing OPDS download links remain available.
 
@@ -298,6 +299,26 @@ The reader's scripts and styles are served with `Cache-Control: no-cache`: the b
   Moving the mouse shows the toolbar for a second; it stays while the mouse is on it or while you type a tag.
   Press `W` or `Esc` to leave this mode.
   The reader remembers your choice; `F` still switches to fullscreen.
+
+### Tags
+
+Add tags to a comic from its info panel or from the reader toolbar.
+The **Tags** page lists them all; click a tag to see its comics.
+
+To combine tags, use the three buttons next to each tag on the **Tags** page:
+
+- **AND**: the comic has every AND tag;
+- **OR**: the comic has at least one of the OR tags;
+- **NOT**: the comic has none of the NOT tags.
+
+Click a pressed button again to release it.
+The bar at the bottom of the page spells out the search, for example `humour AND (crime OR thriller) NOT read`, and **Search** shows the result.
+The result page's address can be bookmarked: `/reader/tag-search?all=humour&any=crime&any=thriller&none=read`.
+
+**Save** gives the combination a name.
+Saved searches are listed at the top of the **Tags** page, where the pencil opens one for editing; saving again under the same name replaces it.
+They are also listed in the OPDS catalog, so a reading app can open them without typing anything.
+Deleting a saved search leaves the tags on the comics.
 
 ### Ongoing series
 

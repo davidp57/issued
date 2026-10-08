@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from ..config import get_config
 from ..database import db_connection
 from ..logging_config import get_logger
+from ..saved_searches import get_saved_search, has_saved_searches, list_saved_searches
 from .feeds import (
     PSE_NAMESPACE,
     _absolute_href,
@@ -24,6 +25,8 @@ from .feeds import (
     _opensearch_response,
     _recent_href,
     _root_href,
+    _saved_search_href,
+    _saved_searches_href,
     _search_href,
     _xml_response,
 )
@@ -84,6 +87,52 @@ def _recent_preview_uuid(conn) -> str | None:
     return row["uuid"] if row else None
 
 
+def _non_leaf_folder_ids(conn, folder_ids: list[int]) -> set[int]:
+    """Folders among ``folder_ids`` that have subfolders, so are not a series."""
+    folder_ids = list(set(folder_ids))
+    if not folder_ids:
+        return set()
+    placeholders = ",".join("?" * len(folder_ids))
+    cur = conn.execute(
+        f"SELECT parent_id FROM folders WHERE parent_id IN ({placeholders})",
+        folder_ids,
+    )
+    return {row["parent_id"] for row in cur.fetchall()}
+
+
+def _comic_entries(comics, non_leaf_ids: set[int], updated: str, base_url: str) -> list[str]:
+    """Acquisition entries for comics from several folders, linked to their series."""
+    entries = []
+    for comic in comics:
+        is_series = comic["folder_id"] not in non_leaf_ids
+        entries.append(
+            _comic_entry_xml(
+                comic["uuid"],
+                comic["display_title"] or comic["filename"],
+                comic["last_scanned_at"] or updated,
+                _comic_media_type(comic["format"]),
+                base_url,
+                series_folder_id=comic["folder_id"] if is_series else None,
+                series_name=comic["folder_name"] if is_series else None,
+                page_count=comic["page_count"],
+            )
+        )
+    return entries
+
+
+def _feed_xml(feed_id: str, title: str, updated: str, base_url: str, self_href: str, entries) -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f'<feed xmlns="http://www.w3.org/2005/Atom" xmlns:pse="{PSE_NAMESPACE}">\n'
+        f"  <id>{feed_id}</id>\n"
+        f"  <title>{_escape_xml(title)}</title>\n"
+        f"  <updated>{updated}</updated>\n"
+        f"{_catalog_links_xml(base_url, self_href)}\n"
+        f"{''.join(entries)}\n"
+        "</feed>"
+    )
+
+
 @router.get("/favicon.ico", include_in_schema=False)
 def favicon() -> Response:
     return Response(status_code=204)
@@ -118,6 +167,7 @@ def opds_root(request: Request) -> Response:
             [folder["id"] for folder in folders],
         )
         recent_preview = _recent_preview_uuid(conn)
+        show_saved_searches = has_saved_searches(conn)
 
     updated = _now_iso()
     base_url = str(request.base_url)
@@ -146,6 +196,16 @@ def opds_root(request: Request) -> Response:
             thumbnail_uuid=recent_preview,
         )
     )
+    if show_saved_searches:
+        entries.append(
+            _navigation_entry_xml(
+                "urn:saved-searches",
+                "Saved searches",
+                _saved_searches_href(),
+                updated,
+                base_url,
+            )
+        )
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -257,39 +317,12 @@ def opds_recent(request: Request, limit: int = Query(50, ge=1, le=200)) -> Respo
             (limit,),
         )
         comics = cur.fetchall()
-        folder_ids = [c["folder_id"] for c in comics]
-        non_leaf_ids = set()
-        if folder_ids:
-            placeholders = ",".join("?" * len(folder_ids))
-            cur = conn.execute(
-                f"SELECT parent_id FROM folders WHERE parent_id IN ({placeholders})",
-                folder_ids,
-            )
-            non_leaf_ids = {row["parent_id"] for row in cur.fetchall()}
+        non_leaf_ids = _non_leaf_folder_ids(conn, [c["folder_id"] for c in comics])
 
     updated = _now_iso()
     base_url = str(request.base_url)
     self_href = _absolute_href(base_url, _recent_href(limit))
-
-    entries = []
-    for comic in comics:
-        updated_ts = comic["last_scanned_at"] or updated
-        media_type = _comic_media_type(comic["format"])
-        comic_uuid = comic["uuid"]
-        title = comic["display_title"] or comic["filename"]
-        is_series = comic["folder_id"] not in non_leaf_ids
-        entries.append(
-            _comic_entry_xml(
-                comic_uuid,
-                title,
-                updated_ts,
-                media_type,
-                base_url,
-                series_folder_id=comic["folder_id"] if is_series else None,
-                series_name=comic["folder_name"] if is_series else None,
-                page_count=comic["page_count"],
-            )
-        )
+    entries = _comic_entries(comics, non_leaf_ids, updated, base_url)
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -320,7 +353,7 @@ def opds_opensearch(request: Request) -> Response:
 
 @router.get("/opds/search")
 def opds_search(request: Request, q: str = Query(..., min_length=1)) -> Response:
-    """Search by filename and metadata (title, series, writer, notes, summary, etc.)."""
+    """Search by filename, metadata (title, series, writer, notes, summary, etc.) and tag names."""
     like = f"%{q}%"
 
     with db_connection() as conn:
@@ -334,42 +367,18 @@ def opds_search(request: Request, q: str = Query(..., min_length=1)) -> Response
             "WHERE c.filename LIKE ? OR m.title LIKE ? OR m.series LIKE ? "
             "   OR m.writer LIKE ? OR m.penciller LIKE ? OR m.notes LIKE ? "
             "   OR m.summary LIKE ? OR m.genre LIKE ? OR m.publisher LIKE ? "
+            "   OR EXISTS (SELECT 1 FROM comic_tags ct JOIN tags t ON t.id = ct.tag_id "
+            "              WHERE ct.comic_id = c.id AND t.name LIKE ?) "
             "ORDER BY c.filename",
-            (like, like, like, like, like, like, like, like, like),
+            (like, like, like, like, like, like, like, like, like, like),
         )
         comics = cur.fetchall()
-        folder_ids = list({c["folder_id"] for c in comics})
-        non_leaf_ids = set()
-        if folder_ids:
-            placeholders = ",".join("?" * len(folder_ids))
-            cur = conn.execute(
-                f"SELECT parent_id FROM folders WHERE parent_id IN ({placeholders})",
-                folder_ids,
-            )
-            non_leaf_ids = {row["parent_id"] for row in cur.fetchall()}
+        non_leaf_ids = _non_leaf_folder_ids(conn, [c["folder_id"] for c in comics])
 
     updated = _now_iso()
     base_url = str(request.base_url)
     self_href = _absolute_href(base_url, _search_href(q))
-    entries = []
-    for comic in comics:
-        updated_ts = comic["last_scanned_at"] or updated
-        media_type = _comic_media_type(comic["format"])
-        comic_uuid = comic["uuid"]
-        title = comic["display_title"] or comic["filename"]
-        is_series = comic["folder_id"] not in non_leaf_ids
-        entries.append(
-            _comic_entry_xml(
-                comic_uuid,
-                title,
-                updated_ts,
-                media_type,
-                base_url,
-                series_folder_id=comic["folder_id"] if is_series else None,
-                series_name=comic["folder_name"] if is_series else None,
-                page_count=comic["page_count"],
-            )
-        )
+    entries = _comic_entries(comics, non_leaf_ids, updated, base_url)
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -382,6 +391,61 @@ def opds_search(request: Request, q: str = Query(..., min_length=1)) -> Response
         "</feed>"
     )
     return _xml_response(xml)
+
+
+@router.get("/opds/saved-searches")
+def opds_saved_searches(request: Request) -> Response:
+    """Navigation feed: one entry per saved tag search."""
+    with db_connection() as conn:
+        searches = list_saved_searches(conn)
+
+    updated = _now_iso()
+    base_url = str(request.base_url)
+    entries = [
+        _navigation_entry_xml(
+            f"urn:saved-search:{search['id']}",
+            search["name"],
+            _saved_search_href(search["id"]),
+            updated,
+            base_url,
+        )
+        for search in searches
+    ]
+    self_href = _absolute_href(base_url, _saved_searches_href())
+    return _xml_response(
+        _feed_xml("urn:saved-searches", "Saved searches", updated, base_url, self_href, entries)
+    )
+
+
+@router.get("/opds/saved-searches/{search_id}")
+def opds_saved_search(search_id: int, request: Request) -> Response:
+    """Acquisition feed: the comics matching a saved tag search."""
+    with db_connection() as conn:
+        search = get_saved_search(conn, search_id)
+        if not search:
+            raise HTTPException(status_code=404, detail="Saved search not found")
+        where, params = search["query"].where_sql()
+        cur = conn.execute(
+            "SELECT c.id, c.uuid, c.filename, c.format, c.last_scanned_at, c.page_count, "
+            "       c.folder_id, f.name AS folder_name, "
+            "       COALESCE(m.title, c.filename) AS display_title "
+            "FROM comics c "
+            "JOIN folders f ON c.folder_id = f.id "
+            "LEFT JOIN metadata m ON m.comic_id = c.id "
+            f"WHERE {where} "
+            "ORDER BY f.name, c.filename",
+            params,
+        )
+        comics = cur.fetchall()
+        non_leaf_ids = _non_leaf_folder_ids(conn, [c["folder_id"] for c in comics])
+
+    updated = _now_iso()
+    base_url = str(request.base_url)
+    entries = _comic_entries(comics, non_leaf_ids, updated, base_url)
+    self_href = _absolute_href(base_url, _saved_search_href(search_id))
+    return _xml_response(
+        _feed_xml(f"urn:saved-search:{search_id}", search["name"], updated, base_url, self_href, entries)
+    )
 
 
 @router.get("/opds/comic/{comic_uuid}/file")
