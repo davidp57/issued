@@ -34,13 +34,14 @@ Read and write text files with an explicit `encoding="utf-8"`: the Windows defau
 
 - `.github/workflows/ci.yml`: `pytest` on Ubuntu and Windows, plus a Docker build without push, on every PR and on pushes to `develop`.
 - `build.yml` and `docker-publish.yml` are the author's release workflows. They push to `ghcr.io/metalogico/...` and are **disabled on the fork** from the Actions settings; leave the files untouched.
+- `.github/workflows/fork-image.yml`: on every push to `develop`, publishes `ghcr.io/davidp57/issued:develop` (plus a `sha-<commit>` tag), `linux/amd64` only — the NAS it runs on is a Synology on amd64. The package is public.
 - Fork PRs are merged once CI is green.
 
 ## Database
 
 - Paths stored in the database are relative to the library root and always use forward slashes (`server/path_utils.py`).
 - Schema and data changes go through an Alembic revision under `migrations/versions/`.
-- Exception: repairing a table that `SQLModel.metadata.create_all()` built with an outdated definition goes in an `ensure_*` function of `server/migrations.py`, called by `serve` at startup. Such a repair needs no slot in the Alembic chain, so it cannot collide with a revision pending elsewhere, and it must be idempotent.
+- Exception: repairing a table that `SQLModel.metadata.create_all()` built with an outdated definition goes in an `ensure_*` function of `server/migrations.py`, called by `_prepare_database()` in `main.py` before `serve` or `scan` touch the database. Such a repair needs no slot in the Alembic chain, so it cannot collide with a revision pending elsewhere, and it must be idempotent.
 
 ## Documentation
 
