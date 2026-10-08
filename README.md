@@ -292,6 +292,7 @@ The reader's scripts and styles are served with `Cache-Control: no-cache`: the b
 - In a series folder, use **Continue series** to resume the most recently opened unfinished issue or start the first unread one. The reader also links to the previous and next issue and offers the next cover when you reach the end.
 - In the reader, click or tap beside the page or near its left or right edge to turn pages; the arrow keys work too.
 - Use **Fit page to window** (or press `W`) to read in a normal browser window with the page as large as the window allows: the site header, the page buttons and the hints go away, and the toolbar hides until you move the mouse or tap the centre of the page.
+  Moving the mouse shows the toolbar for a second; it stays while the mouse is on it or while you type a tag.
   Press `W` or `Esc` to leave this mode.
   The reader remembers your choice; `F` still switches to fullscreen.
 

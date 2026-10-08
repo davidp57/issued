@@ -340,13 +340,33 @@ import {
     }
   };
 
-  const showControls = () => {
-    if (!isImmersive()) return;
-    setControlsVisible(true);
+  // A mouse can come back at any time, so the toolbar leaves soon after it stops moving.
+  // A finger has no hover: after a tap it needs time to reach a button.
+  const HIDE_AFTER_MOUSE_MS = 1000;
+  const HIDE_AFTER_TOUCH_MS = 3000;
+  let pointerOnControls = false;
+
+  // The toolbar stays while the mouse rests on it, while text is typed in it,
+  // and while the mobile actions panel is open.
+  const controlsInUse = () => pointerOnControls
+    || mobileActionsOpen
+    || (readerControls?.contains(document.activeElement)
+      && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
+
+  const scheduleHide = (delay) => {
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
-      if (isImmersive()) setControlsVisible(false);
-    }, 3000);
+      if (!isImmersive()) return;
+      // Still in use: look again later rather than relying on a leave or blur event.
+      if (controlsInUse()) scheduleHide(HIDE_AFTER_MOUSE_MS);
+      else setControlsVisible(false);
+    }, delay);
+  };
+
+  const showControls = (hideAfter = HIDE_AFTER_TOUCH_MS) => {
+    if (!isImmersive()) return;
+    setControlsVisible(true);
+    scheduleHide(hideAfter);
   };
 
   // --- Fit page: the page fills the browser window without the Fullscreen API ---
@@ -408,7 +428,18 @@ import {
   // Touch browsers also emit a compatibility mousemove on every tap, which would bring
   // the toolbars back on each page turn; only a real mouse reveals them by moving.
   reader.addEventListener('pointermove', (event) => {
-    if (event.pointerType === 'mouse') showControls();
+    if (event.pointerType === 'mouse') showControls(HIDE_AFTER_MOUSE_MS);
+  });
+
+  readerControls?.addEventListener('pointerenter', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    pointerOnControls = true;
+    showControls(HIDE_AFTER_MOUSE_MS);
+  });
+  readerControls?.addEventListener('pointerleave', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    pointerOnControls = false;
+    showControls(HIDE_AFTER_MOUSE_MS);
   });
 
   // --- Button events ---
