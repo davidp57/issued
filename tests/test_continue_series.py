@@ -280,6 +280,31 @@ def test_reader_end_panel_offers_the_next_issue(continue_series_app):
     assert "Issue 2 of 3" in response.text
     assert "Next issue" not in response.text
     assert 'class="reader-series-navigation' not in response.text
+    assert 'id="reader-next-issue"' in response.text
+    assert 'id="reader-series-end-close"' in response.text
+
+
+def test_turning_past_the_last_page_opens_the_next_issue():
+    script = (Path(importlib.import_module("reader").__path__[0]) / "static/js/reader.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "const nextIssueLink = $('#reader-next-issue');" in script
+    assert "if (nextIssueLink && !loading) openComic(nextIssueLink);" in script
+    assert "nextBtn.disabled = isLastSpread() && !nextIssueLink;" in script
+    # A held arrow key stops at the last page.
+    assert "ArrowRight: () => { if (!(e.repeat && isLastSpread())) navigate(1); }," in script
+    # A dismissed card comes back once the reader leaves the last page and returns.
+    assert "if (lastVisiblePage < pageCount) seriesEndDismissed = false;" in script
+
+
+def test_end_card_stays_on_screen_in_both_reading_modes():
+    styles = (Path(importlib.import_module("reader").__path__[0]) / "static/css/style.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert ".reader-page #reader-series-end {\n  position: sticky;\n  bottom: 1rem;" in styles
+    assert 'html[data-reader-fit="page"] .reader-page #reader-series-end {\n  bottom: 1rem;\n  left: auto;' in styles
 
 
 def test_missing_comic_in_series_context_has_a_return_path(continue_series_app):

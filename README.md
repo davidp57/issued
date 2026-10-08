@@ -289,7 +289,10 @@ The reader's scripts and styles are served with `Cache-Control: no-cache`: the b
 - Use **Continue Reading** to jump back into comics you have started but not finished.
 - Mark comics as done from the grid or table view.
 - When you are inside a series folder, use **Mark all as completed** if you want to mark the whole series as done.
-- In a series folder, use **Continue series** to resume the most recently opened unfinished issue or start the first unread one. The reader also links to the previous and next issue and offers the next cover when you reach the end.
+- In a series folder, use **Continue series** to resume the most recently opened unfinished issue or start the first unread one.
+- While reading, the toolbar shows the series name and a back button that both open the series folder.
+- On the last page, a card offers the next issue with its cover, or says the series ends here. It stays on screen until you close it or turn back a page.
+  Turning the page once more (the `→` key, a click near the right edge or the **Next** button) opens the next issue; holding the arrow key down stops at the last page.
 - In the reader, click or tap beside the page or near its left or right edge to turn pages; the arrow keys work too.
 - Use **Fit page to window** (or press `W`) to read in a normal browser window with the page as large as the window allows: the site header, the page buttons and the hints go away, and the toolbar hides until you move the mouse or tap the centre of the page.
   Moving the mouse shows the toolbar for a second; it stays while the mouse is on it or while you type a tag.
