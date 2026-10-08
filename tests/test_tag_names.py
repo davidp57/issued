@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import re
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from urllib.parse import quote
 
@@ -74,7 +75,7 @@ def tagged_app(tmp_path, monkeypatch):
         )
         session.commit()
 
-    with sqlite3.connect(db_file) as conn:
+    with closing(sqlite3.connect(db_file)) as conn, conn:
         comic_id = conn.execute("SELECT id FROM comics").fetchone()[0]
         for name in TAG_NAMES:
             cur = conn.execute("INSERT INTO tags (name) VALUES (?)", (name,))
@@ -82,7 +83,8 @@ def tagged_app(tmp_path, monkeypatch):
                 "INSERT INTO comic_tags (comic_id, tag_id) VALUES (?, ?)", (comic_id, cur.lastrowid)
             )
 
-    return db_file, TestClient(app)
+    yield db_file, TestClient(app)
+    engine.dispose()
 
 
 def test_tag_index_links_open_their_own_tag(tagged_app):
@@ -109,7 +111,7 @@ def test_delete_tag_with_special_characters(tagged_app, name):
     response = client.delete(f"/reader/api/tags/{quote(name, safe='')}")
     assert response.status_code == 200
 
-    with sqlite3.connect(db_file) as conn:
+    with closing(sqlite3.connect(db_file)) as conn:
         names = {row[0] for row in conn.execute("SELECT name FROM tags")}
     assert name not in names
     assert len(names) == len(TAG_NAMES) - 1
