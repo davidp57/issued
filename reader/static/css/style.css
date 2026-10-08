@@ -298,6 +298,31 @@ html[data-reader-fit="page"] .reader-page .reader-image-wrap img {
   box-shadow: none;
 }
 
+/* max-height alone never enlarges a scan smaller than the window: the image takes the full
+   height and object-fit keeps its proportions when the width is what limits it. Phones are
+   left out: their width already limits the page. */
+@media (min-width: 640px) {
+  html[data-reader-fit="page"] .reader-page .reader-image-wrap img {
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  html[data-reader-fit="page"] .reader-page .reader-pages.spread-mode img {
+    max-width: calc(50% - 2px);
+  }
+
+  /* When the width limits a spread, each page sits against the spine instead of floating in its half. */
+  html[data-reader-fit="page"] .reader-page .reader-pages.spread-mode #reader-image {
+    object-position: right center;
+  }
+
+  html[data-reader-fit="page"] .reader-page .reader-pages.spread-mode #reader-image-right {
+    object-position: left center;
+  }
+}
+
 html[data-reader-fit="page"] .reader-page #reader-progress-error,
 html[data-reader-fit="page"] .reader-page #reader-series-end {
   position: absolute;

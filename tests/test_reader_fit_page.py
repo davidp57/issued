@@ -53,3 +53,15 @@ def test_page_turn_zones_are_anchored_to_the_displayed_page():
     assert "viewport.dataset.navZone = zoneAt(event.clientX);" in script
     assert '.reader-image-wrap[data-nav-zone="previous"]' in styles
     assert '.reader-image-wrap[data-nav-zone="next"]' in styles
+
+
+def test_fit_page_enlarges_scans_smaller_than_the_window():
+    styles = _read("static", "css", "style.css")
+    start = styles.index("@media (min-width: 640px) {\n  html[data-reader-fit=\"page\"]")
+    block = styles[start:styles.index("\n}\n", start)]
+
+    assert "height: 100%;" in block
+    assert "max-width: 100%;" in block
+    assert "object-fit: contain;" in block
+    assert "#reader-image {\n    object-position: right center;" in block
+    assert "#reader-image-right {\n    object-position: left center;" in block
