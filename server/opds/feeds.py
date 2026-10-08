@@ -86,6 +86,14 @@ def _recent_href(limit: int) -> str:
     return f"/opds/recent?limit={limit}"
 
 
+def _saved_searches_href() -> str:
+    return "/opds/saved-searches"
+
+
+def _saved_search_href(search_id: int) -> str:
+    return f"/opds/saved-searches/{search_id}"
+
+
 def _search_href(q: str) -> str:
     return f"/opds/search?q={quote(q)}"
 

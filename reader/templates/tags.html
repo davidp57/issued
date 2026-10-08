@@ -6,14 +6,49 @@
     class="mb-6 bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
     Tags</h1>
 
+  {% if saved_searches %}
+  <section class="mb-6">
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Saved searches</h2>
+    <ul class="flex flex-wrap gap-3" id="saved-searches-list">
+      {% for s in saved_searches %}
+      <li class="flex items-center gap-0">
+        <a href="{{ url_path(request, 'browse_tag_search') }}?{{ s.query_string }}"
+          class="inline-flex items-center gap-2 rounded-l-full border border-r-0 border-violet-200 bg-white py-2 pl-4 pr-3 text-sm font-medium text-violet-700 shadow-sm transition hover:bg-violet-50"
+          title="{{ s.description }}">
+          <i data-lucide="bookmark" class="h-3.5 w-3.5 shrink-0 text-violet-400"></i>
+          {{ s.name }}
+        </a>
+        <a href="{{ url_path(request, 'browse_tags') }}?{{ s.query_string }}"
+          class="inline-flex h-full items-center border border-r-0 border-violet-200 bg-white px-2.5 py-2 text-gray-400 shadow-sm transition hover:bg-violet-50 hover:text-violet-600"
+          title="Edit &quot;{{ s.name }}&quot;" aria-label="Edit {{ s.name }}">
+          <i data-lucide="pencil" class="h-3.5 w-3.5"></i>
+        </a>
+        <button type="button"
+          class="delete-saved-search-btn inline-flex h-full items-center rounded-r-full border border-violet-200 bg-white px-2.5 py-2 text-gray-300 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 active:scale-95"
+          data-name="{{ s.name }}" data-url="{{ url_path(request, 'api_saved_search_delete', search_id=s.id) }}"
+          title="Delete saved search &quot;{{ s.name }}&quot;" aria-label="Delete saved search {{ s.name }}">
+          <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   {% if not tag_rows %}
   <p class="rounded-2xl border border-violet-100 bg-white/80 p-6 text-gray-600 shadow-sm">
     No tags yet. Open the <strong>info panel</strong> on any comic (✎ button) or use the reader page to add tags.
   </p>
   {% else %}
+  <p id="tag-query-help" class="mb-3 text-sm text-gray-500">
+    Combine tags: <strong class="text-violet-700">AND</strong> the comic has all of them,
+    <strong class="text-sky-600">OR</strong> at least one of them,
+    <strong class="text-red-600">NOT</strong> none of them.
+  </p>
   <ul class="flex flex-wrap gap-3" id="tags-list">
     {% for row in tag_rows %}
-    <li id="tag-item-{{ row.name | urlencode }}" class="group flex items-center gap-0">
+    <li id="tag-item-{{ row.name | urlencode }}" class="tag-item group flex items-center gap-0"
+      data-tag-name="{{ row.name }}" data-state="{{ tag_states.get(row.name, '') }}">
       <a href="{{ url_path(request, 'browse_tag', tag_name=row.name | path_segment) }}"
         class="inline-flex items-center gap-2 rounded-l-full border border-r-0 border-violet-200 bg-white pl-4 pr-3 py-2 text-sm font-medium text-violet-700 shadow-sm transition hover:bg-violet-50">
         <i data-lucide="tag" class="h-3.5 w-3.5 shrink-0 text-violet-400"></i>
@@ -21,6 +56,18 @@
         <span class="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-600">{{ row.comic_count
           }}</span>
       </a>
+      {% set state = tag_states.get(row.name, '') %}
+      <span class="flex h-full" role="group" aria-label="Combine {{ row.name }}">
+        <button type="button" data-state="all" aria-pressed="{{ 'true' if state == 'all' else 'false' }}"
+          class="tag-state-btn h-full border border-r-0 border-violet-200 bg-white px-2 py-2 text-xs font-semibold text-gray-400 shadow-sm transition hover:text-violet-700"
+          title="Comics must have &quot;{{ row.name }}&quot;">AND</button>
+        <button type="button" data-state="any" aria-pressed="{{ 'true' if state == 'any' else 'false' }}"
+          class="tag-state-btn h-full border border-r-0 border-violet-200 bg-white px-2 py-2 text-xs font-semibold text-gray-400 shadow-sm transition hover:text-sky-600"
+          title="Comics must have at least one of the OR tags">OR</button>
+        <button type="button" data-state="none" aria-pressed="{{ 'true' if state == 'none' else 'false' }}"
+          class="tag-state-btn h-full border border-r-0 border-violet-200 bg-white px-2 py-2 text-xs font-semibold text-gray-400 shadow-sm transition hover:text-red-600"
+          title="Comics must not have &quot;{{ row.name }}&quot;">NOT</button>
+      </span>
       <button type="button"
         class="delete-tag-btn inline-flex h-full items-center rounded-r-full border border-violet-200 bg-white px-2.5 py-2 text-gray-300 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 active:scale-95"
         data-tag-name="{{ row.name }}" data-comic-count="{{ row.comic_count }}"
@@ -30,11 +77,162 @@
     </li>
     {% endfor %}
   </ul>
+
+  <div id="tag-query-bar"
+    class="sticky bottom-3 mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-white/90 p-3 shadow-lg backdrop-blur"
+    data-search-url="{{ url_path(request, 'browse_tag_search') }}"
+    data-save-url="{{ url_path(request, 'api_saved_search_save') }}"
+    data-saved-names="{{ saved_searches | map(attribute='name') | list | tojson | forceescape }}">
+    <p id="tag-query-summary" class="w-full min-w-0 text-sm text-gray-600 sm:w-auto sm:flex-1">Select tags to combine.</p>
+    <button type="button" id="tag-query-clear"
+      class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Clear</button>
+    <button type="button" id="tag-query-save"
+      class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40">
+      <i data-lucide="bookmark-plus" class="h-4 w-4"></i>Save</button>
+    <a id="tag-query-search" href="#" aria-disabled="true"
+      class="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 aria-disabled:pointer-events-none aria-disabled:opacity-40">
+      <i data-lucide="search" class="h-4 w-4"></i>Search</a>
+  </div>
   {% endif %}
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
+  (function () {
+    const bar = document.getElementById('tag-query-bar');
+    if (!bar) return;
+    const summary = document.getElementById('tag-query-summary');
+    const searchLink = document.getElementById('tag-query-search');
+    const saveBtn = document.getElementById('tag-query-save');
+    const clearBtn = document.getElementById('tag-query-clear');
+    const savedNames = JSON.parse(bar.dataset.savedNames || '[]');
+
+    function currentQuery() {
+      const query = { all: [], any: [], none: [] };
+      document.querySelectorAll('#tags-list .tag-item').forEach(function (li) {
+        if (li.dataset.state) query[li.dataset.state].push(li.dataset.tagName);
+      });
+      return query;
+    }
+
+    // Same wording as TagQuery.describe() on the server.
+    function describe(query) {
+      const parts = query.all.slice();
+      if (query.any.length) {
+        const joined = query.any.join(' OR ');
+        const grouped = query.any.length > 1 && (parts.length || query.none.length);
+        parts.push(grouped ? '(' + joined + ')' : joined);
+      }
+      let text = parts.join(' AND ');
+      if (query.none.length) {
+        const excluded = query.none.join(' NOT ');
+        text = text ? text + ' NOT ' + excluded : 'NOT ' + excluded;
+      }
+      return text;
+    }
+
+    function queryString(query) {
+      const params = new URLSearchParams();
+      ['all', 'any', 'none'].forEach(function (key) {
+        query[key].forEach(function (name) { params.append(key, name); });
+      });
+      return params.toString();
+    }
+
+    function refresh() {
+      const query = currentQuery();
+      const text = describe(query);
+      const empty = !text;
+      summary.textContent = empty ? 'Select tags to combine.' : text;
+      summary.classList.toggle('font-medium', !empty);
+      summary.classList.toggle('text-gray-900', !empty);
+      searchLink.href = empty ? '#' : bar.dataset.searchUrl + '?' + queryString(query);
+      searchLink.setAttribute('aria-disabled', empty ? 'true' : 'false');
+      saveBtn.disabled = empty;
+      clearBtn.disabled = empty;
+    }
+
+    function setState(li, state) {
+      li.dataset.state = state;
+      li.querySelectorAll('.tag-state-btn').forEach(function (btn) {
+        btn.setAttribute('aria-pressed', btn.dataset.state === state ? 'true' : 'false');
+      });
+    }
+
+    document.getElementById('tags-list').addEventListener('click', function (evt) {
+      const btn = evt.target.closest('.tag-state-btn');
+      if (!btn) return;
+      const li = btn.closest('.tag-item');
+      setState(li, li.dataset.state === btn.dataset.state ? '' : btn.dataset.state);
+      refresh();
+    });
+
+    clearBtn.addEventListener('click', function () {
+      document.querySelectorAll('#tags-list .tag-item').forEach(function (li) { setState(li, ''); });
+      refresh();
+    });
+
+    saveBtn.addEventListener('click', async function () {
+      const query = currentQuery();
+      const named = await Swal.fire({
+        title: 'Save this search',
+        text: describe(query),
+        input: 'text',
+        inputPlaceholder: 'Name, e.g. Unread crime',
+        showCancelButton: true,
+        confirmButtonText: 'Save',
+        inputValidator: function (value) { return value.trim() ? null : 'Give the search a name'; },
+      });
+      if (!named.isConfirmed) return;
+      const name = named.value.trim();
+      if (savedNames.includes(name)) {
+        const replace = await Swal.fire({
+          title: 'Replace “' + name + '”?',
+          text: 'A saved search already has this name.',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Replace',
+        });
+        if (!replace.isConfirmed) return;
+      }
+      try {
+        const res = await fetch(bar.dataset.saveUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({ name: name }, query)),
+        });
+        if (!res.ok) throw new Error(res.status);
+        window.location.search = queryString(query);
+      } catch {
+        Swal.fire({ icon: 'error', title: 'Could not save the search', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+      }
+    });
+
+    window.issuedRefreshTagQuery = refresh;
+    refresh();
+  })();
+
+  document.getElementById('saved-searches-list')?.addEventListener('click', async function (evt) {
+    const btn = evt.target.closest('.delete-saved-search-btn');
+    if (!btn) return;
+    const result = await Swal.fire({
+      title: 'Delete “' + btn.dataset.name + '”?',
+      text: 'Only the saved search goes; the tags stay on the comics.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      confirmButtonText: 'Delete',
+    });
+    if (!result.isConfirmed) return;
+    try {
+      const res = await fetch(btn.dataset.url, { method: 'DELETE' });
+      if (!res.ok) throw new Error(res.status);
+      window.location.reload();
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Could not delete the saved search', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
+    }
+  });
+
   document.getElementById('tags-list')?.addEventListener('click', async function (evt) {
     const btn = evt.target.closest('.delete-tag-btn');
     if (!btn) return;
@@ -44,7 +242,7 @@
       ? `It will be removed from <strong>${comicCount} comic${comicCount !== 1 ? 's' : ''}</strong>.`
       : 'It is not assigned to any comic.';
     const result = await Swal.fire({
-      title: `Delete \u201c${tagName}\u201d?`,
+      title: `Delete “${tagName}”?`,
       html: `${countNote} This cannot be undone.`,
       icon: 'warning',
       showCancelButton: true,
@@ -57,11 +255,14 @@
       const res = await fetch('/reader/api/tags/' + encodeURIComponent(tagName), { method: 'DELETE' });
       if (!res.ok) throw new Error(res.status);
       btn.closest('li')?.remove();
+      window.issuedRefreshTagQuery?.();
       if (!document.querySelector('#tags-list li')) {
+        document.getElementById('tag-query-bar')?.remove();
+        document.getElementById('tag-query-help')?.remove();
         document.getElementById('tags-list').replaceWith(
           Object.assign(document.createElement('p'), {
             className: 'rounded-2xl border border-violet-100 bg-white/80 p-6 text-gray-600 shadow-sm',
-            innerHTML: 'No tags yet. Open the <strong>info panel</strong> on any comic (\u270e button) or use the reader page to add tags.',
+            innerHTML: 'No tags yet. Open the <strong>info panel</strong> on any comic (✎ button) or use the reader page to add tags.',
           })
         );
       }

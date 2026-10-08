@@ -1028,6 +1028,24 @@ html[data-theme="dark"] .display-option[aria-pressed="true"] {
   color: #ddd6fe !important;
 }
 
+/* Tag combination buttons (tags page). !important so the dark theme's
+   .bg-white / .text-gray-400 overrides do not hide the pressed state. */
+.tag-state-btn[aria-pressed="true"] {
+  color: #fff !important;
+}
+
+.tag-state-btn[aria-pressed="true"][data-state="all"] {
+  background-color: #7c3aed !important;
+}
+
+.tag-state-btn[aria-pressed="true"][data-state="any"] {
+  background-color: #0ea5e9 !important;
+}
+
+.tag-state-btn[aria-pressed="true"][data-state="none"] {
+  background-color: #ef4444 !important;
+}
+
 /* --- Color theme --- */
 html[data-theme="dark"] {
   color-scheme: dark;
