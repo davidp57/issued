@@ -144,27 +144,38 @@ def test_delete_path_removes_tagged_folder(tmp_path, monkeypatch, legacy_schema)
         conn.close()
 
 
-def test_migration_0004_adds_cascade_and_keeps_tags(tmp_path, monkeypatch):
-    lib, _, drop = _library(tmp_path)
+def _comic_tags_sql(db_file: Path) -> str:
+    conn = sqlite3.connect(db_file)
+    try:
+        return conn.execute("SELECT sql FROM sqlite_master WHERE name = 'comic_tags'").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def test_repair_adds_cascade_and_keeps_tags(tmp_path, monkeypatch):
+    lib, _, _ = _library(tmp_path)
     db_file = _patch_db(tmp_path, monkeypatch)
     monkeypatch.setattr("server.migrations.DB_PATH", db_file, raising=True)
     config = _make_config(lib)
     scanner.scan_library(config, force=True)
     _use_legacy_comic_tags(db_file)
     _tag_all_comics(db_file)
+    conn = sqlite3.connect(db_file)
+    try:
+        # an orphan link, as a legacy DB may hold one: dropped by the repair
+        conn.execute("INSERT INTO comic_tags (comic_id, tag_id) VALUES (9999, 1)")
+        conn.commit()
+    finally:
+        conn.close()
 
-    from alembic import command
-    from server.migrations import _alembic_cfg
+    from server.migrations import ensure_comic_tags_cascade
 
-    command.stamp(_alembic_cfg(), "0003")
-    command.upgrade(_alembic_cfg(), "head")
+    assert ensure_comic_tags_cascade() is True
+    assert _comic_tags_sql(db_file).upper().count("ON DELETE CASCADE") == 2
+    assert ensure_comic_tags_cascade() is False  # idempotent
 
     conn = sqlite3.connect(db_file)
     try:
-        sql = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE name = 'comic_tags'"
-        ).fetchone()[0]
-        assert "ON DELETE CASCADE" in sql.upper()
         assert conn.execute("SELECT COUNT(*) FROM comic_tags").fetchone()[0] == 2
         # with the cascade in place, a raw delete no longer violates the FK
         conn.execute("PRAGMA foreign_keys=ON")
@@ -175,3 +186,16 @@ def test_migration_0004_adds_cascade_and_keeps_tags(tmp_path, monkeypatch):
         assert conn.execute("SELECT COUNT(*) FROM comic_tags").fetchone()[0] == 1
     finally:
         conn.close()
+
+
+def test_repair_leaves_current_schema_alone(tmp_path, monkeypatch):
+    lib, _, _ = _library(tmp_path)
+    db_file = _patch_db(tmp_path, monkeypatch)
+    monkeypatch.setattr("server.migrations.DB_PATH", db_file, raising=True)
+    scanner.scan_library(_make_config(lib), force=True)
+    before = _comic_tags_sql(db_file)
+
+    from server.migrations import ensure_comic_tags_cascade
+
+    assert ensure_comic_tags_cascade() is False
+    assert _comic_tags_sql(db_file) == before
