@@ -26,11 +26,8 @@ def env(tmp_path, monkeypatch):
     """A library with one comic, scanned, and the reader app wired to it."""
     db_file = tmp_path / "library.db"
     monkeypatch.setattr("server.database.DB_PATH", db_file, raising=True)
-    monkeypatch.setattr(
-        "server.database.engine",
-        create_engine(f"sqlite:///{db_file}", connect_args={"check_same_thread": False}),
-        raising=True,
-    )
+    engine = create_engine(f"sqlite:///{db_file}", connect_args={"check_same_thread": False})
+    monkeypatch.setattr("server.database.engine", engine, raising=True)
     monkeypatch.setattr("server.config.DATA_DIR", tmp_path / "data", raising=True)
     init_db()
 
@@ -63,7 +60,8 @@ def env(tmp_path, monkeypatch):
     e.set_mode = set_mode
     e.config = lambda: holder["config"]
     e.client = TestClient(app)
-    return e
+    yield e
+    engine.dispose()
 
 
 def _rows(db_file: Path, sql: str) -> list[tuple]:
