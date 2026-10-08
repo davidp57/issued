@@ -40,6 +40,7 @@ Read and write text files with an explicit `encoding="utf-8"`: the Windows defau
 
 - Paths stored in the database are relative to the library root and always use forward slashes (`server/path_utils.py`).
 - Schema and data changes go through an Alembic revision under `migrations/versions/`.
+- Exception: repairing a table that `SQLModel.metadata.create_all()` built with an outdated definition goes in an `ensure_*` function of `server/migrations.py`, called by `serve` at startup. Such a repair needs no slot in the Alembic chain, so it cannot collide with a revision pending elsewhere, and it must be idempotent.
 
 ## Documentation
 
