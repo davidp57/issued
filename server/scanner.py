@@ -23,6 +23,7 @@ from .archive import ComicFormat, detect_archive_format, get_archive
 from .comicinfo import ComicMetadataUpdate, read_comicinfo_from_archive
 from .config import IssuedConfig
 from .database import get_engine, init_db
+from .deletion import check_deleted
 from .logging_config import get_logger
 from .models import Comic, Folder
 from .path_utils import to_absolute, to_relative
@@ -233,6 +234,9 @@ def process_comic(
     # Check if comic exists and should be skipped
     comic_in_db = repo.get_comic_by_path(comic_path)
     existing = comic_in_db is not None
+
+    if not existing and check_deleted(comic_path, file_size, repo.session, repo.library_root):
+        return None, False, True, False
 
     try:
         detected_format = detect_archive_format(comic_path)

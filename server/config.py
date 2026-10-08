@@ -84,6 +84,25 @@ class ReaderAuthConfig:
         return bool(self.user.strip() and self.password)
 
 
+DELETION_MODES = ("off", "delete", "trash")
+
+
+@dataclasses.dataclass
+class DeletionConfig:
+    """How the web reader deletes a comic.
+
+    ``off`` hides the delete action, ``delete`` removes the file from disk,
+    ``trash`` moves it under ``trash_path``, which must lie outside the library.
+    """
+
+    mode: str = "off"
+    trash_path: Optional[pathlib.Path] = None
+
+    @property
+    def enabled(self) -> bool:
+        return self.mode != "off"
+
+
 @dataclasses.dataclass
 class IssuedConfig:
     library: LibraryConfig
@@ -92,6 +111,7 @@ class IssuedConfig:
     scanner: ScannerConfig
     monitoring: MonitoringConfig
     reader_auth: ReaderAuthConfig
+    deletion: DeletionConfig = dataclasses.field(default_factory=DeletionConfig)
 
     @property
     def library_path(self) -> pathlib.Path:
@@ -186,6 +206,8 @@ def load_config(config_path: Optional[pathlib.Path] = None) -> IssuedConfig:
     else:
         reader_auth = ReaderAuthConfig()
 
+    deletion = _load_deletion(parser, lib_path)
+
     return IssuedConfig(
         library=LibraryConfig(path=lib_path, name=lib_name),
         server=server,
@@ -193,7 +215,30 @@ def load_config(config_path: Optional[pathlib.Path] = None) -> IssuedConfig:
         scanner=scanner,
         monitoring=monitoring,
         reader_auth=reader_auth,
+        deletion=deletion,
     )
+
+
+def _load_deletion(
+    parser: configparser.ConfigParser, library_path: pathlib.Path
+) -> DeletionConfig:
+    mode = parser.get("deletion", "mode", fallback="off").strip().lower() or "off"
+    if mode not in DELETION_MODES:
+        raise ValueError(
+            f"[deletion] mode must be one of {', '.join(DELETION_MODES)}, got {mode!r}"
+        )
+    raw_trash = parser.get("deletion", "trash_path", fallback="").strip()
+    trash_path = pathlib.Path(raw_trash).expanduser() if raw_trash else None
+
+    if mode == "trash":
+        if trash_path is None:
+            raise ValueError("[deletion] mode = trash requires trash_path")
+        # A trash inside the library would be scanned like any other folder.
+        if trash_path.resolve().is_relative_to(library_path.resolve()):
+            raise ValueError(
+                f"[deletion] trash_path must lie outside the library: {trash_path}"
+            )
+    return DeletionConfig(mode=mode, trash_path=trash_path)
 
 
 _cached_config: Optional[IssuedConfig] = None

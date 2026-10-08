@@ -92,3 +92,26 @@ class ComicTag(SQLModel, table=True):
 
     comic_id: int = Field(foreign_key="comics.id", primary_key=True, ondelete="CASCADE")
     tag_id: int = Field(foreign_key="tags.id", primary_key=True, ondelete="CASCADE")
+
+
+class DeletedComic(SQLModel, table=True):
+    """Trace of a comic deleted from the web reader.
+
+    The scanner skips a file whose name matches a trace and whose content
+    hashes to the same ``sha256``, so a deleted comic is not imported again.
+    A file with the same name but other content is imported, and the trace
+    records it in ``conflict_path`` so the trash page can show it.
+    """
+
+    __tablename__ = "deleted_comics"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    filename: str = Field(index=True)
+    path: str  # relative to the library root, as Comic.path was
+    file_size: int
+    sha256: str
+    mode: str  # "delete" or "trash"
+    trash_path: Optional[str] = None  # relative to the trash root, when mode == "trash"
+    deleted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    conflict_path: Optional[str] = None
+    conflict_at: Optional[datetime] = None

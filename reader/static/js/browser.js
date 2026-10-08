@@ -232,6 +232,50 @@
     }
   });
 
+  // --- Delete comic ---
+
+  const deleteBtn = document.getElementById('comic-info-delete');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      const uuid = form.dataset.uuid;
+      if (!uuid) return;
+      const filename = filenameEl.textContent;
+      const toTrash = deleteBtn.dataset.mode === 'trash';
+      const answer = await Swal.fire({
+        icon: 'warning',
+        title: toTrash ? 'Move to trash?' : 'Delete from disk?',
+        text: toTrash
+          ? `"${filename}" will be moved to the trash folder.`
+          : `"${filename}" will be deleted from disk. This cannot be undone.`,
+        showCancelButton: true,
+        confirmButtonText: toTrash ? 'Move to trash' : 'Delete',
+        confirmButtonColor: '#dc2626',
+        focusCancel: true,
+      });
+      if (!answer.isConfirmed) return;
+
+      deleteBtn.disabled = true;
+      try {
+        const res = await fetch(`/reader/api/comic/${uuid}`, { method: 'DELETE' });
+        if (!res.ok) {
+          let detail = 'Please try again.';
+          try {
+            const payload = await res.json();
+            if (typeof payload?.detail === 'string') detail = payload.detail;
+          } catch { /* ignore JSON parse errors */ }
+          throw new Error(detail);
+        }
+        setModalOpen(false);
+        toast('success', toTrash ? 'Moved to trash' : 'Deleted', filename, 2000);
+        setTimeout(() => window.location.reload(), 500);
+      } catch (err) {
+        toast('error', 'Delete failed', err instanceof Error ? err.message : 'Please try again.', 4500);
+      } finally {
+        deleteBtn.disabled = false;
+      }
+    });
+  }
+
   // --- Continue reading counter ---
 
   document.addEventListener('htmx:afterRequest', (evt) => {

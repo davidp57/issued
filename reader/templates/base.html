@@ -82,6 +82,10 @@
             class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-violet-50 hover:text-violet-800 touch-manipulation">Tags</a>
           <a href="{{ url_path(request, 'browse_last_added') }}"
             class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-violet-50 hover:text-violet-800 touch-manipulation">Recent</a>
+          {% if deletion_mode() != 'off' %}
+          <a href="{{ url_path(request, 'browse_trash') }}"
+            class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-violet-50 hover:text-violet-800 touch-manipulation">Trash</a>
+          {% endif %}
           {% if reader_auth_enabled %}
           <form action="{{ url_path(request, 'reader_logout') }}" method="post" class="inline">
             <button type="submit"

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="trash fade-in">
+  <h1
+    class="mb-6 bg-gradient-to-r from-violet-600 via-purple-600 to-pink-600 bg-clip-text text-2xl font-bold text-transparent sm:text-3xl">
+    Trash</h1>
+
+  <p class="mb-6 text-sm text-gray-600">
+    The scanner does not import these comics again while they are listed here.
+    <strong>Forget</strong> removes a comic from this list, so a file with that name is imported again.
+  </p>
+
+  {% if not deleted_comics %}
+  <p class="rounded-2xl border border-violet-100 bg-white/80 p-6 text-gray-600 shadow-sm">No deleted comics.</p>
+  {% else %}
+  <div class="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-md">
+    <table class="w-full min-w-[720px] border-collapse text-sm">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <th class="py-3 pl-4 pr-3">Comic</th>
+          <th class="py-3 pr-3">Deleted</th>
+          <th class="py-3 pr-3">How</th>
+          <th class="py-3 pr-4 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for d in deleted_comics %}
+        <tr class="trash-row align-top transition-colors hover:bg-violet-50/60" data-trace-id="{{ d.id }}">
+          <td class="py-3 pl-4 pr-3">
+            <span class="block font-semibold text-gray-800">{{ d.filename }}</span>
+            <span class="block break-all text-xs text-gray-500">{{ d.path }}</span>
+            {% if d.conflict_path %}
+            <span class="trash-conflict mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+              <i data-lucide="triangle-alert" class="mt-0.5 h-3.5 w-3.5 shrink-0"></i>
+              <span>A different file with this name was imported on {{ d.conflict_at.strftime('%Y-%m-%d') }}:
+                <span class="break-all font-medium">{{ d.conflict_path }}</span></span>
+            </span>
+            {% endif %}
+          </td>
+          <td class="py-3 pr-3 text-gray-600">{{ d.deleted_at.strftime('%Y-%m-%d') }}</td>
+          <td class="py-3 pr-3 text-gray-600">{% if d.mode == 'trash' %}Moved to trash{% else %}Deleted from disk{% endif %}</td>
+          <td class="py-3 pr-4">
+            <div class="flex justify-end gap-2">
+              {% if d.mode == 'trash' %}
+              <button type="button" data-action="restore" data-filename="{{ d.filename }}"
+                class="trash-action rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 active:scale-95">Restore</button>
+              {% endif %}
+              <button type="button" data-action="forget" data-filename="{{ d.filename }}"
+                class="trash-action rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 active:scale-95">Forget</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_path(request, 'reader_static', path='/js/trash.js') }}"></script>
+{% endblock %}

@@ -15,6 +15,7 @@ from .browse import router as _browse_router
 from .api_comic import router as _api_comic_router
 from .api_folder import router as _api_folder_router
 from .api_library import router as _api_library_router
+from .api_trash import router as _api_trash_router
 
 router = APIRouter(tags=["reader"])
 router.include_router(_auth_router)
@@ -22,5 +23,6 @@ router.include_router(_browse_router)
 router.include_router(_api_comic_router)
 router.include_router(_api_folder_router)
 router.include_router(_api_library_router)
+router.include_router(_api_trash_router)
 
 __all__ = ["router", "TEMPLATES_DIR", "STATIC_DIR"]
