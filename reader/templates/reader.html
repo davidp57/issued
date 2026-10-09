@@ -3,7 +3,7 @@
 {% block body_class %}reader-page{% endblock %}
 {% block content %}
 <div class="reader fade-in flex min-h-[100dvh] flex-col sm:min-h-[calc(100vh-5rem)]" data-comic-uuid="{{ comic_uuid }}"
-  data-page-count="{{ page_count }}" data-initial-page="{{ initial_page }}"
+  data-page-count="{{ page_count }}" data-initial-page="{{ initial_page }}" data-page-version="{{ page_version }}"
   data-was-completed="{{ 'true' if was_completed else 'false' }}"
   {% if series_navigation %}data-navigation-url="{{ url_path(request, 'api_comic_navigation', comic_uuid=comic_uuid) }}?context=series"{% endif %}
   tabindex="0"
@@ -154,7 +154,7 @@
     data-zoomed="false" title="Tap near an edge to navigate; double-tap to zoom">
     <div id="reader-spinner" class="reader-spinner" aria-label="Loading page"></div>
     <div id="reader-pages" class="reader-pages">
-      <img id="reader-image" src="{{ url_path(request, 'api_comic_page', comic_uuid=comic_uuid, page_num=initial_page) }}"
+      <img id="reader-image" src="{{ url_path(request, 'api_comic_page', comic_uuid=comic_uuid, page_num=initial_page) }}{% if page_version %}?v={{ page_version|urlencode }}{% endif %}"
         alt="Page {{ initial_page }}"
         class="max-h-[75dvh] max-w-full rounded-lg shadow-2xl transition-opacity duration-300 select-none pointer-events-none sm:max-h-[80vh]"
         draggable="false">

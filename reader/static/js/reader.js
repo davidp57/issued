@@ -47,6 +47,8 @@ import {
 
   const comicUuid = reader.dataset.comicUuid;
   const pageCount = parseInt(reader.dataset.pageCount, 10) || 1;
+  // Changes when the file on disk changes, so a replaced file never shows cached pages.
+  const pageVersion = reader.dataset.pageVersion;
   const initialPage = parseInt(reader.dataset.initialPage, 10) || 1;
   const wasCompleted = reader.dataset.wasCompleted === 'true';
 
@@ -90,7 +92,75 @@ import {
   const syncMobileActionsLayout = () => closeMobileActions();
 
   const pageUrl = (p) =>
-    `/reader/api/comic/${encodeURIComponent(comicUuid)}/page/${p}`;
+    `/reader/api/comic/${encodeURIComponent(comicUuid)}/page/${p}`
+    + (pageVersion ? `?v=${encodeURIComponent(pageVersion)}` : '');
+
+  // --- Preloading ---
+  // The rest of the issue is downloaded in the background, one page at a time, into the
+  // browser's HTTP cache (on disk): turning a page then needs no request. Only the next
+  // few pages are also decoded, because a decoded page is a full bitmap held in memory
+  // (width × height × 4 bytes, about 24 MB for a 2000×3000 scan).
+  // Two spreads ahead in spread mode, three pages otherwise.
+  const decodeAhead = () => (twoPageMode ? 4 : 3);
+  // With the browser's data saver on, only the pages about to be decoded are downloaded.
+  const saveData = Boolean(navigator.connection?.saveData);
+  const downloaded = new Set();
+  const failed = new Set();
+  const decoded = new Map();
+  let preloadRunning = false;
+  let preloadAbort = null;
+
+  const decodeWindow = () => {
+    const first = lastVisiblePage + 1;
+    const last = Math.min(pageCount, lastVisiblePage + decodeAhead());
+    decoded.forEach((_, page) => { if (page < first || page > last) decoded.delete(page); });
+    for (let page = first; page <= last; page++) {
+      if (decoded.has(page) || !downloaded.has(page)) continue;
+      const image = new Image();
+      image.src = pageUrl(page);
+      image.decode().catch(() => { });
+      decoded.set(page, image);
+    }
+  };
+
+  // The next page to download is always the first missing one after the visible spread,
+  // so a page turn or a jump redirects the download without aborting it.
+  const nextToDownload = () => {
+    const limit = saveData ? Math.min(pageCount, lastVisiblePage + decodeAhead()) : pageCount;
+    for (let page = lastVisiblePage + 1; page <= limit; page++) {
+      if (!downloaded.has(page) && !failed.has(page)) return page;
+    }
+    return null;
+  };
+
+  const preload = async () => {
+    if (preloadRunning) { decodeWindow(); return; }
+    preloadRunning = true;
+    preloadAbort = new AbortController();
+    try {
+      // A page being displayed stops the loop; the end of its loading starts it again.
+      for (let page = nextToDownload(); page !== null && !loading; page = nextToDownload()) {
+        let response;
+        try {
+          response = await fetch(pageUrl(page), { priority: 'low', signal: preloadAbort.signal });
+          // Reading the body to the end is what stores the response in the cache.
+          if (response.ok) await response.arrayBuffer();
+        } catch (_) {
+          // Aborted or offline: stop here, the next page turn tries again.
+          return;
+        }
+        if (!response.ok) {
+          failed.add(page);
+          continue;
+        }
+        downloaded.add(page);
+        if (page <= lastVisiblePage + decodeAhead()) decodeWindow();
+      }
+      decodeWindow();
+    } finally {
+      preloadRunning = false;
+    }
+  };
 
   const setSpinner = (on) => spinner?.classList.toggle('visible', on);
 
@@ -170,6 +240,8 @@ import {
       setSpinner(false);
       loading = false;
       if (pagesEl) pagesEl.classList.toggle('spread-mode', !!rightPage);
+      // Preloading waits for the visible pages so it never delays them.
+      preload();
     };
 
     // Load left page
@@ -525,6 +597,7 @@ import {
   updatePage(initialPage);
   window.addEventListener('pagehide', () => {
     interactions?.destroy();
+    preloadAbort?.abort();
     mobileReaderQuery.removeEventListener('change', syncMobileActionsLayout);
   }, { once: true });
 })();

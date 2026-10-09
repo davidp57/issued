@@ -298,6 +298,7 @@ def reader_view(
             "issue_title": issue_title,
             "page_count": page_count,
             "initial_page": initial_page,
+            "page_version": comic.get("version", ""),
             "was_completed": bool((progress or {}).get("is_completed")),
             "series_navigation": series_navigation,
             "reader_auth_enabled": _reader_auth_enabled(),
