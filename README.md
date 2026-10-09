@@ -337,6 +337,9 @@ user = yourname
 password = yourpassword
 ```
 
+This protects the web reader only; the OPDS catalog has no password of its own.
+To protect both, see [Password protection behind a proxy](#password-protection-behind-a-proxy).
+
 ## Common Tasks
 
 ### Add new comics
@@ -484,6 +487,31 @@ protocol.
 When nginx, Caddy, Traefik, or another proxy runs in a separate container, add
 `FORWARDED_ALLOW_IPS=*` to the Issued container environment, or replace `*`
 with the proxy network/IP range. This lets Uvicorn trust the forwarded protocol.
+
+### Password protection behind a proxy
+
+The `[reader]` user and password protect the web reader only, with a login page.
+The OPDS catalog has no password of its own: to protect it, let the proxy ask for one with HTTP basic authentication, which OPDS apps support.
+
+Applying basic authentication to the whole site works, but the browser then shows its own sign-in dialog, which some password managers (1Password among them) cannot fill.
+To avoid it, apply basic authentication to everything except the web reader, and let the `[reader]` login page protect the reader.
+With Caddy:
+
+```
+:80 {
+	@not_reader not path / /reader /reader/*
+	basic_auth @not_reader {
+		yourname $2a$14$...   # hash from `caddy hash-password`
+	}
+	redir / /reader/
+	reverse_proxy issued:8181
+}
+```
+
+- `/` is left out of the matcher so that it redirects to the reader without a dialog: Caddy runs `basic_auth` before `redir`, whatever their order in the file.
+- Everything else (`/opds/`, the API documentation at `/docs`) still asks for the basic authentication password.
+- Set `[reader]` in `config.ini` and restart Issued, which reads `config.ini` only at startup: without it, the reader would be open to anyone.
+- The reader login lasts 7 days.
 
 ## Troubleshooting
 
