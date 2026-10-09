@@ -91,10 +91,13 @@ def api_comic_page(comic_uuid: str, page_num: int):
     if not result:
         raise HTTPException(status_code=404, detail="Page not found")
     data, content_type = result
+    # The web reader downloads the rest of the issue in the background;
+    # a day keeps those pages cached through a long reading session. Its page URLs
+    # carry the file version, so a replaced file is fetched again at once.
     return Response(
         content=data,
         media_type=content_type,
-        headers={"Cache-Control": "private, max-age=3600"},
+        headers={"Cache-Control": "private, max-age=86400"},
     )
 
 

@@ -34,7 +34,12 @@ def _natural_sort_key(name: str):
 
 
 def get_comic_by_uuid(comic_uuid: str) -> Optional[dict]:
-    """Return comic info by UUID: path (absolute), page_count, filename. None if not found."""
+    """Return comic info by UUID: path (absolute), page_count, filename, version.
+
+    ``version`` changes whenever the file on disk changes, even before a rescan;
+    the reader puts it in page URLs so a replaced file never shows cached pages.
+    None if not found.
+    """
     config = get_config()
     with db_connection() as conn:
         cur = conn.execute(
@@ -47,7 +52,9 @@ def get_comic_by_uuid(comic_uuid: str) -> Optional[dict]:
         return None
 
     abs_path = to_absolute(row["path"], config.library_path)
-    if not abs_path.exists():
+    try:
+        stat = abs_path.stat()
+    except OSError:
         return None
 
     page_count = row["page_count"] or 0
@@ -62,6 +69,7 @@ def get_comic_by_uuid(comic_uuid: str) -> Optional[dict]:
         "path": abs_path,
         "page_count": page_count,
         "filename": row["filename"],
+        "version": f"{stat.st_mtime_ns}-{stat.st_size}",
     }
 
 

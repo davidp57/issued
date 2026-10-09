@@ -295,6 +295,10 @@ The reader's scripts and styles are served with `Cache-Control: no-cache`: the b
 - On the last page, a card offers the next issue with its cover, or says the series ends here. It stays on screen until you close it or turn back a page.
   Turning the page once more (the `→` key, a click near the right edge or the **Next** button) opens the next issue; holding the arrow key down stops at the last page.
 - In the reader, click or tap beside the page or near its left or right edge to turn pages; the arrow keys work too.
+- While you read, the reader downloads the rest of the issue in the background, one page at a time, so the next pages open without waiting.
+  The pages go to the browser's cache on disk and only the next three (two spreads in two-page view) are kept ready in memory, so a long issue does not fill the device's memory.
+  With the browser's data saver on, only those next pages are downloaded ahead.
+  When a comic file is replaced on disk, the reader shows the new pages on the next opening, even before a rescan.
 - Use **Fit page to window** (or press `W`) to read in a normal browser window with the page as large as the window allows: the site header, the page buttons and the hints go away, and the toolbar hides until you move the mouse or tap the centre of the page.
   Moving the mouse shows the toolbar for a second; it stays while the mouse is on it or while you type a tag.
   Press `W` or `Esc` to leave this mode.

@@ -1,6 +1,7 @@
 """OPDS-PSE contracts, using real page bytes and isolated existing OPDS fixtures."""
 
 import io
+import re
 import shutil
 import subprocess
 import zipfile
@@ -120,10 +121,29 @@ def test_first_last_and_reader_numbering(client, book):
         original = client.get(f'/reader/api/comic/pse-book/page/{reader_index}')
         assert original.status_code == 200
         assert original.headers['content-type'] == 'image/png'
+        assert original.headers['cache-control'] == 'private, max-age=86400'
         with Image.open(io.BytesIO(original.content)) as image:
             assert image.getpixel((5, 5))[channel] == 255
     for index in (0, 3):
         assert client.get(f'/reader/api/comic/pse-book/page/{index}').status_code == 404
+
+
+def test_reader_page_urls_change_with_the_file(client, book):
+    path = book[0]
+
+    def version():
+        response = client.get('/reader/comic/pse-book')
+        assert response.status_code == 200
+        match = re.search(r'data-page-version="([^"]+)"', response.text)
+        assert match
+        assert f'/page/1?v={match[1]}"' in response.text
+        return match[1]
+
+    before = version()
+    with zipfile.ZipFile(path, 'a') as archive:
+        archive.writestr('page30.png', image_bytes(color='green'))
+    assert version() != before
+    assert client.get(f'/reader/api/comic/pse-book/page/1?v={before}').status_code == 200
 
 
 @pytest.mark.parametrize(('uuid', 'page', 'status'), [
