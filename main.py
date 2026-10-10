@@ -11,7 +11,7 @@ import typer
 from sqlmodel import Session, select
 
 from server.archive import configure_rar_tool
-from server.config import DEFAULT_CONFIG_PATH, IssuedConfig, load_config
+from server.config import API_TOKEN_MIN_LENGTH, DEFAULT_CONFIG_PATH, IssuedConfig, load_config
 from server.database import get_engine, init_db, reset_database
 from server.migrations import (
     ensure_ongoing_series_table,
@@ -170,6 +170,12 @@ def serve(
     
     typer.echo(typer.style(STARTUP_BANNER, fg=typer.colors.MAGENTA, bold=True))
     config = _ensure_config()
+    if config.reader_auth.api_token_too_short:
+        # Never log the token itself, not even a prefix.
+        logger.warning(
+            "API token ignored: it must be at least %d characters long",
+            API_TOKEN_MIN_LENGTH,
+        )
     _prepare_database()
 
     if ensure_comic_tags_cascade():

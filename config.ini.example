@@ -27,6 +27,9 @@ debounce_seconds = 2
 # Web reader login (leave empty to allow access without password)
 user =
 password =
+# Token for automation tools calling /reader/api/* with the X-Issued-Token
+# header (at least 32 characters). ISSUED_API_TOKEN overrides it.
+# api_token =
 
 [deletion]
 # Delete action in the web reader: off, delete (removes the file from disk)

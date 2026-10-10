@@ -72,16 +72,33 @@ class MonitoringConfig:
     debounce_seconds: int = 2
 
 
+API_TOKEN_ENV_VAR = "ISSUED_API_TOKEN"
+API_TOKEN_MIN_LENGTH = 32
+
+
 @dataclasses.dataclass
 class ReaderAuthConfig:
     """Credentials for web reader access. If both set, login is required."""
 
     user: str = ""
     password: str = ""
+    # Kept out of repr() so that printing the config never leaks it.
+    api_token: str = dataclasses.field(default="", repr=False)
 
     @property
     def enabled(self) -> bool:
         return bool(self.user.strip() and self.password)
+
+    @property
+    def active_api_token(self) -> str:
+        """The API token, or "" when it is too short to be trusted."""
+        if len(self.api_token) < API_TOKEN_MIN_LENGTH:
+            return ""
+        return self.api_token
+
+    @property
+    def api_token_too_short(self) -> bool:
+        return bool(self.api_token) and not self.active_api_token
 
 
 DELETION_MODES = ("off", "delete", "trash")
@@ -201,13 +218,11 @@ def load_config(config_path: Optional[pathlib.Path] = None) -> IssuedConfig:
         ),
     )
 
-    if parser.has_section("reader"):
-        reader_auth = ReaderAuthConfig(
-            user=parser.get("reader", "user", fallback="").strip(),
-            password=parser.get("reader", "password", fallback="").strip(),
-        )
-    else:
-        reader_auth = ReaderAuthConfig()
+    reader_auth = ReaderAuthConfig(
+        user=parser.get("reader", "user", fallback="").strip(),
+        password=parser.get("reader", "password", fallback="").strip(),
+        api_token=_load_api_token(parser),
+    )
 
     deletion = _load_deletion(parser, lib_path)
 
@@ -220,6 +235,14 @@ def load_config(config_path: Optional[pathlib.Path] = None) -> IssuedConfig:
         reader_auth=reader_auth,
         deletion=deletion,
     )
+
+
+def _load_api_token(parser: configparser.ConfigParser) -> str:
+    # The environment wins so that the token can stay out of config.ini.
+    # raw=True: a "%" in the token must not be read as interpolation syntax.
+    return os.environ.get(API_TOKEN_ENV_VAR, "").strip() or parser.get(
+        "reader", "api_token", raw=True, fallback=""
+    ).strip()
 
 
 def _load_deletion(

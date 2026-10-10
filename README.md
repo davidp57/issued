@@ -454,6 +454,7 @@ debounce_seconds = 2     # Wait time before processing changes
 [reader]
 user =                   # Leave empty for no password
 password =               # Leave empty for no password
+api_token =              # Token for /reader/api/*, see "API access with a token"
 
 [deletion]
 mode = off               # off, delete (from disk) or trash
@@ -516,6 +517,39 @@ With Caddy:
 - Everything else (`/opds/`, the API documentation at `/docs`) still asks for the basic authentication password.
 - Set `[reader]` in `config.ini` and restart Issued, which reads `config.ini` only at startup: without it, the reader would be open to anyone.
 - The reader login lasts 7 days.
+
+### API access with a token
+
+An automation tool can call the reader API (`/reader/api/*`) with a token instead of going through the login page.
+The token is sent in the `X-Issued-Token` header, because a proxy doing basic authentication already uses `Authorization`.
+
+Generate a token of at least 32 characters:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Pass it to the container with the `ISSUED_API_TOKEN` environment variable, which takes priority over `api_token` in the `[reader]` section of `config.ini`:
+
+```yaml
+services:
+  issued:
+    environment:
+      - ISSUED_API_TOKEN=your-generated-token
+```
+
+Then call the API:
+
+```bash
+curl -H "X-Issued-Token: your-generated-token" https://issued.example.com/reader/api/tags
+```
+
+- The token only matters when the `[reader]` user and password are set; without them the API is already open.
+- It opens `/reader/api/*` only: the reader pages still ask for the login.
+- A wrong token gets a `401` answer in JSON, without a redirect to the login page.
+- A token shorter than 32 characters is ignored, and Issued logs a warning at startup: every call with the header then gets a `401`.
+- Issued never writes the token to its logs.
+- With the Caddy example above, `/reader/api/*` is outside the basic authentication, so the header reaches Issued directly.
 
 ## Troubleshooting
 
