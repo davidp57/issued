@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 from urllib.parse import quote
 
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..config import get_config
 from reader import auth as reader_auth
+
+API_TOKEN_HEADER = "X-Issued-Token"
 
 
 class ReaderAuthMiddleware(BaseHTTPMiddleware):
@@ -31,6 +34,17 @@ class ReaderAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         if not config.reader_auth.enabled:
             return await call_next(request)
+        api_token = config.reader_auth.active_api_token
+        provided = request.headers.get(API_TOKEN_HEADER)
+        # The token opens the JSON API only; HTML pages keep the login flow.
+        # Without a usable token configured, any header is a wrong one: an API
+        # client gets a 401 it can read rather than the HTML login page.
+        if provided is not None and path.startswith("/reader/api/"):
+            if api_token and hmac.compare_digest(
+                provided.encode("utf-8"), api_token.encode("utf-8")
+            ):
+                return await call_next(request)
+            return JSONResponse({"detail": "Invalid API token"}, status_code=401)
         cookie = request.cookies.get(reader_auth.SESSION_COOKIE_NAME)
         if reader_auth.verify_session_cookie(cookie, config.reader_auth.password):
             return await call_next(request)
